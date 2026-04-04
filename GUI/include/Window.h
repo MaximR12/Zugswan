@@ -25,7 +25,7 @@ namespace GUI {
         GLFWwindow* m_window;
 
     public:
-        Window(const char* title, int width, int height, Game::GameState* state);
+        Window(const char* title, int width, int height, GameState* state);
         ~Window();
 
         GLFWwindow* getWindow() { return m_window; }

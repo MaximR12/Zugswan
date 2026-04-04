@@ -1,12 +1,11 @@
 #include "MoveGen.h"
+#include <array>
 
-using namespace Game;
-
-void appendFromBB(MoveArr& moveArr, IndArr& moveList, uint16_t from, uint64_t targets, uint16_t flag) {
-   Board::serializeBitboard(targets, moveList);
-   for(int i = 0; i < moveList.size; ++i) {
-      uint16_t to = moveList[i];
-      moveArr.append(flag, from, to);
+void appendFromBB(std::vector<Move>& moveList, std::array<uint16_t, NUM_SQUARES>& indBuf, uint16_t from, uint64_t targets, uint16_t flag) {
+   uint16_t numSquares = Board::serializeBitboard(targets, indBuf);
+   for(uint16_t sq = 0; sq < numSquares; ++sq) {
+      uint16_t toInd = indBuf[sq]; 
+      moveList.emplace_back(flag, from, toInd);
    }
 }
 
@@ -15,8 +14,8 @@ uint64_t wpSinglePushTargets(Board* const board, uint64_t wPawns, uint64_t empty
 }
 
 uint64_t wpDoublePushTargets(Board* const board, uint64_t wPawns, uint64_t empty) {
-   uint64_t singlePushs = wpSinglePushTargets(board, wPawns, empty);
-   return board->shiftNorth(wPawns) & empty & RANK_4;
+   uint64_t singlePushes = wpSinglePushTargets(board, wPawns, empty);
+   return board->shiftNorth(singlePushes) & empty & RANK_4;
 }
 
 uint64_t bpSinglePushTargets(Board* const board, uint64_t bPawns, uint64_t empty) {
@@ -24,125 +23,140 @@ uint64_t bpSinglePushTargets(Board* const board, uint64_t bPawns, uint64_t empty
 }
 
 uint64_t bpDoublePushTargets(Board* const board, uint64_t bPawns, uint64_t empty) {
-   uint64_t singlePushs = bpSinglePushTargets(board, bPawns, empty);
-   return board->shiftSouth(bPawns) & empty & RANK_5;
+   uint64_t singlePushes = bpSinglePushTargets(board, bPawns, empty);
+   return board->shiftSouth(singlePushes) & empty & RANK_5;
 }
 
-void appendPawnPushMoves(Board* board, MoveArr& moveArr, uint64_t wPawns, uint64_t bPawns, uint64_t empty) {
+void appendWhitePawnPushMoves(Board* board, std::vector<Move>& moveList, std::array<uint16_t, NUM_SQUARES>& indBuf, uint64_t wPawns, uint64_t bPawns, uint64_t empty) {
    const int singleRankOffset = 8, doubleRankOffset = 16;
 
-   IndArr wSinglePushTargetList;
-   Board::serializeBitboard(wpSinglePushTargets(board, wPawns, empty), wSinglePushTargetList);
-   IndArr wDoublePushTargetList;
-   Board::serializeBitboard(wpDoublePushTargets(board, wPawns, empty), wDoublePushTargetList);
-   for(int i = 0; i < wSinglePushTargetList.size; ++i) {
-      uint16_t toInd = wSinglePushTargetList[i];
-      moveArr.append(toInd, toInd-singleRankOffset, QUIET_MOVE);
+   uint16_t numSquares = Board::serializeBitboard(wpSinglePushTargets(board, wPawns, empty), indBuf);
+   for(uint16_t sq = 0; sq < numSquares; ++sq) {
+      uint16_t toInd = indBuf[sq]; 
+      moveList.emplace_back(QUIET_MOVE, toInd-singleRankOffset, toInd);
    }
-   for(int i = 0; i < wDoublePushTargetList.size; ++i) {
-      uint16_t toInd = wDoublePushTargetList[i];
-      moveArr.append(toInd, toInd-doubleRankOffset, DOUBLE_PAWN_PUSH);
-   }
-
-   IndArr bSinglePushTargetList;
-   Board::serializeBitboard(wpSinglePushTargets(board, bPawns, empty), bSinglePushTargetList);
-   IndArr bDoublePushTargetList;
-   Board::serializeBitboard(wpDoublePushTargets(board, bPawns, empty), bDoublePushTargetList);
-   for(int i = 0; i < bSinglePushTargetList.size; ++i) {
-      uint16_t toInd = bSinglePushTargetList[i];
-      moveArr.append(toInd, toInd+singleRankOffset, QUIET_MOVE);
-   }
-   for(int i = 0; i < bDoublePushTargetList.size; ++i) {
-      uint16_t toInd = bDoublePushTargetList[i];
-      moveArr.append(toInd, toInd+doubleRankOffset, DOUBLE_PAWN_PUSH);
+   numSquares = Board::serializeBitboard(wpDoublePushTargets(board, wPawns, empty), indBuf);
+   for(uint16_t sq = 0; sq < numSquares; ++sq) {
+      uint16_t toInd = indBuf[sq]; 
+      moveList.emplace_back(DOUBLE_PAWN_PUSH, toInd-doubleRankOffset, toInd);
    }
 }
 
-void appendPawnCaptureMoves(Board* board, MoveArr& moveArr, uint64_t wPawns, uint64_t bPawns, uint64_t empty) {
-   IndArr wPawnInds, targetsList;
-   Board::serializeBitboard(wPawns, wPawnInds);
-   for(int i = 0; i < wPawnInds.size; ++i) {
-      uint16_t from = wPawnInds[i];
-      uint64_t targets = board->getWhitePawnAttacks(from) & board->getPieceSet(Board::blackPieces);
-      if(!targets) continue;
-      appendFromBB(moveArr, targetsList, from, targets, CAPTURE);
-   }
+void appendBlackPawnPushMoves(Board* board, std::vector<Move>& moveList, std::array<uint16_t, NUM_SQUARES>& indBuf, uint64_t wPawns, uint64_t bPawns, uint64_t empty) {
+   const int singleRankOffset = 8, doubleRankOffset = 16;
 
-   IndArr bPawnInds;
-   targetsList.reset();
-   Board::serializeBitboard(bPawns, bPawnInds);
-   for(int i = 0; i < bPawnInds.size; ++i) {
-      uint16_t from = bPawnInds[i];
-      uint64_t targets = board->getBlackPawnAttacks(from) & board->getPieceSet(Board::whitePieces);
-      if(!targets) continue;
-      appendFromBB(moveArr, targetsList, from, targets, CAPTURE);
+   uint16_t numSquares = Board::serializeBitboard(bpSinglePushTargets(board, bPawns, empty), indBuf);
+   for(uint16_t sq = 0; sq < numSquares; ++sq) {
+      uint16_t toInd = indBuf[sq]; 
+      moveList.emplace_back(QUIET_MOVE, toInd+singleRankOffset, toInd);
+   }
+   numSquares = Board::serializeBitboard(bpDoublePushTargets(board, bPawns, empty), indBuf);
+   for(uint16_t sq = 0; sq < numSquares; ++sq) {
+      uint16_t toInd = indBuf[sq]; 
+      moveList.emplace_back(DOUBLE_PAWN_PUSH, toInd+doubleRankOffset, toInd);
    }
 }
 
-void appendPawnMoves(Board* const board, MoveArr& moveArr) {
+void appendWhitePawnCaptureMoves(Board* board, std::vector<Move>& moveList, std::array<uint16_t, NUM_SQUARES>& indBuf, uint64_t wPawns, uint64_t bPawns, uint64_t empty) {
+   uint16_t numSquares = Board::serializeBitboard(wPawns, indBuf);
+   std::array<uint16_t, NUM_SQUARES> targetsBuf;
+   for(uint16_t sq = 0; sq < numSquares; ++sq) {
+      uint16_t fromInd = indBuf[sq];
+      uint64_t targets = board->getWhitePawnAttacks(fromInd) & board->getPieceSet(Board::blackPieces);
+      if(!targets) continue;
+      appendFromBB(moveList, targetsBuf, fromInd, targets, CAPTURE);
+   }
+}
+
+void appendBlackPawnCaptureMoves(Board* board, std::vector<Move>& moveList, std::array<uint16_t, NUM_SQUARES>& indBuf, uint64_t wPawns, uint64_t bPawns, uint64_t empty) {
+   uint16_t numSquares = Board::serializeBitboard(bPawns, indBuf);
+   std::array<uint16_t, NUM_SQUARES> targetsBuf;
+   for(uint16_t sq = 0; sq < numSquares; ++sq) {
+      uint16_t fromInd = indBuf[sq];
+      uint64_t targets = board->getBlackPawnAttacks(fromInd) & board->getPieceSet(Board::whitePieces);
+      if(!targets) continue;
+      appendFromBB(moveList, targetsBuf, fromInd, targets, CAPTURE);
+   }
+}
+
+void appendPawnMoves(Board* const board, std::vector<Move>& moveList, std::array<uint16_t, NUM_SQUARES>& indBuf, Turn turn) {
    uint64_t wPawns = board->getPieceSet(Board::whitePawns);
    uint64_t bPawns = board->getPieceSet(Board::blackPawns);
    uint64_t empty = board->getEmpty();
 
-   appendPawnPushMoves(board, moveArr, wPawns, bPawns, empty);
-   appendPawnCaptureMoves(board, moveArr, wPawns, bPawns, empty);
+   if(turn == Turn::WHITE) {
+      appendWhitePawnPushMoves(board, moveList, indBuf, wPawns, bPawns, empty);
+      appendWhitePawnCaptureMoves(board, moveList, indBuf, wPawns, bPawns, empty);
+   } else {
+      appendBlackPawnPushMoves(board, moveList, indBuf, wPawns, bPawns, empty);
+      appendBlackPawnCaptureMoves(board, moveList, indBuf, wPawns, bPawns, empty);
+   }
 }
 
-void appendKingMovesHelper(Board* const board, MoveArr& moveArr, uint16_t from, uint64_t ownPieces, uint64_t oppPieces) {
+void appendKnightMovesHelper(Board* const board, std::vector<Move>& moveList, std::array<uint16_t, NUM_SQUARES>& indBuf, uint64_t knights, uint64_t ownPieces, uint64_t oppPieces) {
+   uint16_t numSquares = Board::serializeBitboard(knights, indBuf);
+   std::array<uint16_t, NUM_SQUARES> targetsBuf;
+
+   for(uint16_t sq = 0; sq < numSquares; ++sq) {
+      uint16_t fromInd = indBuf[sq];
+      uint64_t targets = board->getKnightMoves(fromInd) & ~ownPieces;
+      if(!targets) continue;
+
+      uint64_t attackTargets = targets & oppPieces;
+      uint64_t quietTargets = targets ^ attackTargets;
+      appendFromBB(moveList, targetsBuf, fromInd, quietTargets, QUIET_MOVE);
+      appendFromBB(moveList, targetsBuf, fromInd, attackTargets, CAPTURE);
+   }
+}
+
+void appendKnightMoves(Board* const board, std::vector<Move>& moveList, std::array<uint16_t, NUM_SQUARES>& indBuf, Turn turn) {
+   uint64_t knights, ownPieces, oppPieces;
+   if(turn == Turn::WHITE) {
+      knights = board->getPieceSet(Board::whiteKnights);
+      ownPieces = board->getPieceSet(Board::whitePieces);
+      oppPieces = board->getPieceSet(Board::blackPieces);
+   } else {
+      knights = board->getPieceSet(Board::blackKnights);
+      ownPieces = board->getPieceSet(Board::blackPieces);
+      oppPieces = board->getPieceSet(Board::whitePieces);
+   }
+
+   appendKnightMovesHelper(board, moveList, indBuf, knights, ownPieces, oppPieces);
+}
+
+void appendKingMovesHelper(Board* const board, std::vector<Move>& moveList, std::array<uint16_t, NUM_SQUARES>& indBuf, uint16_t from, uint64_t ownPieces, uint64_t oppPieces) {
    uint64_t kingMoves = board->getKingMoves(from) & ~ownPieces;
    uint64_t attackTargets = kingMoves & oppPieces;
    uint64_t quietTargets = kingMoves ^ attackTargets;
 
-   IndArr quietsList;
-   IndArr attacksList;
-   appendFromBB(moveArr, quietsList, from, quietTargets, QUIET_MOVE);
-   appendFromBB(moveArr, attacksList, from, attackTargets, CAPTURE);
+   appendFromBB(moveList, indBuf, from, quietTargets, QUIET_MOVE);
+   appendFromBB(moveList, indBuf, from, attackTargets, CAPTURE);
 }
 
-void appendKingMoves(Board* const board, MoveArr& moveArr) {
-   uint16_t wFrom = Board::serializeSingleBit(board->getPieceSet(Board::whiteKing));
-   uint16_t bFrom = Board::serializeSingleBit(board->getPieceSet(Board::blackKing));
-   uint64_t wPieces = board->getPieceSet(Board::whitePieces);
-   uint64_t bPieces = board->getPieceSet(Board::blackPieces);
-   
-   appendKingMovesHelper(board, moveArr, wFrom, wPieces, bPieces); //append white king moves
-   appendKingMovesHelper(board, moveArr, bFrom, bPieces, wPieces); //append black king moves
-}
-
-void appendKnightMovesHelper(Board* const board, MoveArr& moveArr, uint64_t knights, uint64_t ownPieces, uint64_t oppPieces) {
-   IndArr knightSquares;
-   Board::serializeBitboard(knights, knightSquares);
-
-   IndArr quietsList;
-   IndArr attacksList;
-   for(int i = 0; i < knightSquares.size; ++i) {
-      uint16_t from = knightSquares[i];
-      uint64_t targets = board->getKnightMoves(from) & ~ownPieces;
-      if(!targets) continue;
-
-      quietsList.reset(), attacksList.reset();
-      uint64_t attackTargets = targets & oppPieces;
-      uint64_t quietTargets = targets ^ attackTargets;
-      appendFromBB(moveArr, quietsList, from, quietTargets, QUIET_MOVE);
-      appendFromBB(moveArr, attacksList, from, attackTargets, CAPTURE);
+void appendKingMoves(Board* const board, std::vector<Move>& moveList, std::array<uint16_t, NUM_SQUARES>& indBuf, Turn turn) {
+   uint16_t from;
+   uint64_t ownPieces, oppPieces;
+   if(turn == Turn::WHITE) {
+      from = Board::serializeSingleBit(board->getPieceSet(Board::whiteKing));
+      ownPieces = board->getPieceSet(Board::whitePieces);
+      oppPieces = board->getPieceSet(Board::blackPieces);
+   } else {
+      from = Board::serializeSingleBit(board->getPieceSet(Board::blackKing));
+      ownPieces = board->getPieceSet(Board::blackPieces);
+      oppPieces = board->getPieceSet(Board::whitePieces);
    }
-}
-
-void appendKnightMoves(Board* const board, MoveArr& moveArr) {
-   uint64_t wKnights = board->getPieceSet(Board::whiteKnights);
-   uint64_t bKnights = board->getPieceSet(Board::blackKnights);
-   uint64_t wPieces = board->getPieceSet(Board::whitePieces);
-   uint64_t bPieces = board->getPieceSet(Board::blackPieces);
    
-   appendKnightMovesHelper(board, moveArr, wKnights, wPieces, bPieces); //append white knight moves
-   appendKnightMovesHelper(board, moveArr, bKnights, bPieces, wPieces); //append black knight moves
+   appendKingMovesHelper(board, moveList, indBuf, from, ownPieces, oppPieces);
 }
 
-MoveArr MoveGen::getLegalMoves() {
-   MoveArr psuedoLegal;
-   appendPawnMoves(m_board, psuedoLegal);
-   appendKingMoves(m_board, psuedoLegal);
-   appendKnightMoves(m_board, psuedoLegal);
+std::vector<Move> MoveGen::getLegalMoves(Turn turn) {
+   std::vector<Move> psuedoLegal;
+   psuedoLegal.reserve(MAX_LEGAL_MOVES);
+   std::array<uint16_t, NUM_SQUARES> indBuf;
+
+   appendPawnMoves(m_board, psuedoLegal, indBuf, turn);
+   appendKingMoves(m_board, psuedoLegal, indBuf, turn);
+   appendKnightMoves(m_board, psuedoLegal, indBuf, turn);
 
    return psuedoLegal;
 }

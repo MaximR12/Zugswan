@@ -20,7 +20,6 @@ Board class encapsulating piece bitboards using little endian rank file mappings
 1  7  6  5  4  3  2  1  0   
 */
 
-namespace Game {
     constexpr uint64_t UNIVERSE = 0xFFFFFFFFFFFFFFFFULL;
     constexpr uint64_t EMPTY = 0x0000000000000000ULL;
 
@@ -52,90 +51,84 @@ namespace Game {
     constexpr int NUM_SQUARES = 64;
     constexpr int NUM_DIRECTIONS = 8;
     constexpr int ROW_LEN = 8;
-    constexpr int PAWN_SQUARES = NUM_SQUARES-ROW_LEN*2;
 
-    struct IndArr {
-        std::array<uint16_t, NUM_SQUARES> arr;
-        size_t size;
+class Board {
+private:
+    void initMoveTables();
 
-        IndArr() : size{0}, arr{} { }
-        void append(uint16_t ind) { assert(size < MAX_LEGAL_MOVES); arr[size++] = ind; }
-        void reset() { size = 0; }
-        uint16_t operator[] (int index) { return arr[index]; }
+    std::array<uint64_t, NUM_PIECE_TYPES> m_pieceBB;
+    uint64_t m_emptyBB;
+    uint64_t m_occupiedBB;
+
+    std::array<uint64_t, NUM_SQUARES> m_whitePawnAttackTable;
+    std::array<uint64_t, NUM_SQUARES> m_blackPawnAttackTable;
+    std::array<uint64_t, NUM_SQUARES> m_kingMoveTable;
+    std::array<uint64_t, NUM_SQUARES> m_knightMoveTable;
+    std::array<uint64_t, NUM_SQUARES> m_bishopMoveTable;
+    std::array<uint64_t, NUM_SQUARES> m_rookMoveTable;
+    std::array<uint64_t, NUM_SQUARES> m_queenMoveTable;
+    std::array<std::array<uint64_t, NUM_SQUARES>, NUM_DIRECTIONS> m_rayAttackTable; 
+
+public:
+    enum PieceType {
+        whitePieces, blackPieces, 
+        whitePawns, whiteKnights, whiteBishops, whiteRooks, whiteQueens, whiteKing,
+        blackPawns, blackKnights, blackBishops, blackRooks, blackQueens, blackKing,
+        invalid
     };
 
-    class Board {
-    private:
-        void initMoveTables();
-
-        std::array<uint64_t, NUM_PIECE_TYPES> m_pieceBB;
-        uint64_t m_emptyBB;
-        uint64_t m_occupiedBB;
-
-        std::array<uint64_t, PAWN_SQUARES> m_whitePawnAttackTable;
-        std::array<uint64_t, PAWN_SQUARES> m_blackPawnAttackTable;
-        std::array<uint64_t, NUM_SQUARES> m_kingMoveTable;
-        std::array<uint64_t, NUM_SQUARES> m_knightMoveTable;
-        std::array<uint64_t, NUM_SQUARES> m_bishopMoveTable;
-        std::array<uint64_t, NUM_SQUARES> m_rookMoveTable;
-        std::array<uint64_t, NUM_SQUARES> m_queenMoveTable;
-        std::array<std::array<uint64_t, NUM_SQUARES>, NUM_DIRECTIONS> m_rayAttackTable; 
-
-    public:
-        enum PieceType {
-            whitePieces, blackPieces, 
-            whitePawns, whiteKnights, whiteBishops, whiteRooks, whiteQueens, whiteKing,
-            blackPawns, blackKnights, blackBishops, blackRooks, blackQueens, blackKing
-        };
-
-        enum Directions {
-            north, south, east, west, northWest, northEast, southWest, southEast
-        };
-
-        Board() {
-            m_occupiedBB = m_pieceBB[whitePieces] | m_pieceBB[blackPieces];
-            m_emptyBB = ~m_occupiedBB;
-
-            m_pieceBB[whitePieces] = RANK_1 | RANK_2;
-            m_pieceBB[blackPieces] = RANK_7 | RANK_8;
-            m_pieceBB[whitePawns] = RANK_2; 
-            m_pieceBB[blackPawns] = RANK_7;
-            m_pieceBB[whiteKnights] = WHITE_KNIGHTS; 
-            m_pieceBB[blackKnights] = BLACK_KNIGHTS; 
-            m_pieceBB[whiteBishops] = WHITE_BISHOPS; 
-            m_pieceBB[blackBishops] = BLACK_BISHOPS; 
-            m_pieceBB[whiteRooks] = WHITE_ROOKS; 
-            m_pieceBB[blackRooks] = BLACK_ROOKS; 
-            m_pieceBB[whiteQueens] = WHITE_QUEENS; 
-            m_pieceBB[blackQueens] = BLACK_QUEENS; 
-            m_pieceBB[whiteKing] = WHITE_KING; 
-            m_pieceBB[blackKing] = BLACK_KING; 
-        
-            initMoveTables();
-        };
-
-        uint64_t getPieceSet(PieceType type) const { return m_pieceBB[type]; }
-        uint64_t getOccupied() const { return m_occupiedBB; }
-        uint64_t getEmpty() const { return m_emptyBB; }
-
-        uint64_t getWhitePawnAttacks(int squareInd) const { assert(squareInd >= ROW_LEN && squareInd < NUM_SQUARES-ROW_LEN*2); return m_whitePawnAttackTable[squareInd]; }
-        uint64_t getBlackPawnAttacks(int squareInd) const { assert(squareInd >= ROW_LEN && squareInd < NUM_SQUARES-ROW_LEN*2); return m_blackPawnAttackTable[squareInd]; }
-        uint64_t getKingMoves(int squareInd) const { assert(squareInd >= 0 && squareInd < NUM_SQUARES); return m_kingMoveTable[squareInd]; }
-        uint64_t getKnightMoves(int squareInd) const { assert(squareInd >= 0 && squareInd < NUM_SQUARES); return m_knightMoveTable[squareInd]; }
-
-        void updateBB(PieceType type, uint64_t BB) { m_pieceBB[type] = BB; }
-
-        static uint64_t shiftSouth(uint64_t BB) { return (BB >> 8); }
-        static uint64_t shiftNorth(uint64_t BB) { return (BB << 8); }
-        static uint64_t shiftEast(uint64_t BB) { return (BB << 1) & NOT_A_FILE; }
-        static uint64_t shiftNortheast(uint64_t BB) { return (BB << 9) & NOT_A_FILE; }
-        static uint64_t shiftSoutheast(uint64_t BB) { return (BB >> 7) & NOT_A_FILE; }
-        static uint64_t shiftWest(uint64_t BB) { return (BB >> 1) & NOT_H_FILE; }
-        static uint64_t shiftNorthwest(uint64_t BB) { return (BB << 7) & NOT_H_FILE; }
-        static uint64_t shiftSouthwest(uint64_t BB) { return (BB >> 9) & NOT_H_FILE; }
-
-        static uint16_t bitScanForward(uint64_t BB) { assert(BB != 0); return std::countr_zero(BB); }
-        static uint16_t serializeSingleBit(uint64_t BB) { return bitScanForward(BB); } //serialization: get square indices from bitboards
-        static void serializeBitboard(uint64_t BB, IndArr& arr);
+    enum Directions {
+        north, south, east, west, northWest, northEast, southWest, southEast
     };
-}
+
+    Board() {
+        m_pieceBB[whitePieces] = RANK_1 | RANK_2;
+        m_pieceBB[blackPieces] = RANK_7 | RANK_8;
+        m_pieceBB[whitePawns] = RANK_2; 
+        m_pieceBB[blackPawns] = RANK_7;
+        m_pieceBB[whiteKnights] = WHITE_KNIGHTS; 
+        m_pieceBB[blackKnights] = BLACK_KNIGHTS; 
+        m_pieceBB[whiteBishops] = WHITE_BISHOPS; 
+        m_pieceBB[blackBishops] = BLACK_BISHOPS; 
+        m_pieceBB[whiteRooks] = WHITE_ROOKS; 
+        m_pieceBB[blackRooks] = BLACK_ROOKS; 
+        m_pieceBB[whiteQueens] = WHITE_QUEENS; 
+        m_pieceBB[blackQueens] = BLACK_QUEENS; 
+        m_pieceBB[whiteKing] = WHITE_KING; 
+        m_pieceBB[blackKing] = BLACK_KING; 
+
+        m_occupiedBB = m_pieceBB[whitePieces] | m_pieceBB[blackPieces];
+        m_emptyBB = ~m_occupiedBB;
+    
+        initMoveTables();
+    };
+
+    uint64_t getPieceSet(PieceType type) const { return m_pieceBB[type]; }
+    uint64_t getOccupied() const { return m_occupiedBB; }
+    uint64_t getEmpty() const { return m_emptyBB; }
+
+    uint64_t getWhitePawnAttacks(uint16_t ind) const { assert(ind >= ROW_LEN && ind < NUM_SQUARES-ROW_LEN); return m_whitePawnAttackTable[ind]; }
+    uint64_t getBlackPawnAttacks(uint16_t ind) const { assert(ind >= ROW_LEN && ind < NUM_SQUARES-ROW_LEN); return m_blackPawnAttackTable[ind]; }
+    uint64_t getKingMoves(uint16_t ind) const { assert(ind >= 0 && ind < NUM_SQUARES); return m_kingMoveTable[ind]; }
+    uint64_t getKnightMoves(uint16_t ind) const { assert(ind >= 0 && ind < NUM_SQUARES); return m_knightMoveTable[ind]; }
+
+    PieceType getPieceColor(uint16_t ind) const { assert(ind >= 0 && ind < NUM_SQUARES); return m_pieceBB[whitePieces]&(1ULL<<ind) ? whitePieces : blackPieces; }
+    PieceType getPieceType(uint16_t ind) const;
+
+    void updateBB(PieceType type, uint64_t BB) { m_pieceBB[type] = BB; }
+    void updateOccupiedBB(uint64_t BB) { m_occupiedBB = BB; }
+    void updateEmptyBB(uint64_t BB) { m_emptyBB = BB; }
+
+    static uint64_t shiftSouth(uint64_t BB) { return (BB >> 8); }
+    static uint64_t shiftNorth(uint64_t BB) { return (BB << 8); }
+    static uint64_t shiftEast(uint64_t BB) { return (BB << 1) & NOT_A_FILE; }
+    static uint64_t shiftNortheast(uint64_t BB) { return (BB << 9) & NOT_A_FILE; }
+    static uint64_t shiftSoutheast(uint64_t BB) { return (BB >> 7) & NOT_A_FILE; }
+    static uint64_t shiftWest(uint64_t BB) { return (BB >> 1) & NOT_H_FILE; }
+    static uint64_t shiftNorthwest(uint64_t BB) { return (BB << 7) & NOT_H_FILE; }
+    static uint64_t shiftSouthwest(uint64_t BB) { return (BB >> 9) & NOT_H_FILE; }
+
+    static uint16_t bitScanForward(uint64_t BB) { assert(BB != 0); return std::countr_zero(BB); }
+    static uint16_t serializeSingleBit(uint64_t BB) { return bitScanForward(BB); } //get square indices from bitboards
+    static uint16_t serializeBitboard(uint64_t BB, std::array<uint16_t, NUM_SQUARES>& indBuf);
+};

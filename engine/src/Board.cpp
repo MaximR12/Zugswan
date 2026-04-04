@@ -1,7 +1,5 @@
 #include "Board.h"
 
-using namespace Game;
-
 uint64_t wpAttackTargets(uint64_t wPawns) {
     uint64_t westAttacks = Board::shiftNorthwest(wPawns);
     uint64_t eastAttacks = Board::shiftNortheast(wPawns); 
@@ -14,13 +12,13 @@ uint64_t bpAttackTargets(uint64_t bPawns) {
     return westAttacks | eastAttacks;
 }
 
-void initPawnAttackTables(std::array<uint64_t, NUM_SQUARES-ROW_LEN*2>& whitePawnAttackTable, std::array<uint64_t, NUM_SQUARES-ROW_LEN*2>& blackPawnAttackTable) {
+void initPawnAttackTables(std::array<uint64_t, NUM_SQUARES>& whitePawnAttackTable, std::array<uint64_t, NUM_SQUARES>& blackPawnAttackTable) {
     uint64_t currBB = 1;
-    for(int i = ROW_LEN; i < PAWN_SQUARES; ++i, currBB <<= 1) 
+    for(int i = ROW_LEN; i < NUM_SQUARES-ROW_LEN; ++i, currBB <<= 1) 
         whitePawnAttackTable[i] = wpAttackTargets(currBB);
 
     currBB = 1;
-    for(int i = ROW_LEN; i < PAWN_SQUARES; ++i, currBB <<= 1) 
+    for(int i = ROW_LEN; i < NUM_SQUARES-ROW_LEN; ++i, currBB <<= 1) 
         blackPawnAttackTable[i] = bpAttackTargets(currBB);        
 }   
 
@@ -54,10 +52,10 @@ uint64_t knightAttackTargets(uint64_t squareSet) {
     return attacks;
 }
 
-void initKnightMoveTable(std::array<uint64_t, NUM_SQUARES>& knightAttackTable) {
+void initKnightMoveTable(std::array<uint64_t, NUM_SQUARES>& knightMoveTable) {
     uint64_t currBB = 1;
-    for(int sq = 0; sq < NUM_SQUARES; ++sq, currBB <<= 1)
-        knightAttackTable[sq] = knightAttackTargets(currBB);
+    for(int sq = 0; sq < NUM_SQUARES; ++sq, currBB <<= 1) 
+        knightMoveTable[sq] = knightAttackTargets(currBB);
 }
 
 void initRankAttacks(std::array<std::array<uint64_t, NUM_SQUARES>, NUM_DIRECTIONS>& rayAttackTable) {
@@ -127,6 +125,7 @@ void initRayAttackTable(std::array<std::array<uint64_t, NUM_SQUARES>, NUM_DIRECT
 
 void Board::initMoveTables() {
     initPawnAttackTables(m_whitePawnAttackTable, m_blackPawnAttackTable);
+    initKnightMoveTable(m_knightMoveTable);
     initKingMoveTable(m_kingMoveTable);
     initRayAttackTable(m_rayAttackTable);
 
@@ -139,9 +138,30 @@ void Board::initMoveTables() {
     }
 }
 
-void Board::serializeBitboard(uint64_t BB, IndArr& arr) {
+Board::PieceType Board::getPieceType(uint16_t ind) const {
+    assert(ind >= 0 && ind < NUM_SQUARES); 
+
+    PieceType color = this->getPieceColor(ind);
+    if(color == whitePieces) {
+        for(int curPieceSet = whitePawns; curPieceSet < whiteKing; ++curPieceSet) { //loop over white piece bitboards
+            if(m_pieceBB[curPieceSet]&(1ULL<<ind))
+                return static_cast<PieceType>(curPieceSet);
+        }   
+    } else {
+        for(int curPieceSet = blackPawns; curPieceSet < blackKing; ++curPieceSet) { //loop over black piece bitboards
+            if(m_pieceBB[curPieceSet]&(1ULL<<ind))
+                return static_cast<PieceType>(curPieceSet);
+        }   
+    }
+
+    return invalid;
+}
+
+uint16_t Board::serializeBitboard(uint64_t BB, std::array<uint16_t, NUM_SQUARES>& indBuf) {
+    uint16_t count = 0;
     while(BB) {
-        arr.append(bitScanForward(BB));
+        indBuf[count++] = bitScanForward(BB);
         BB &= (BB - 1);
     }
+    return count;
 }

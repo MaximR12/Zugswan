@@ -5,12 +5,14 @@
 #include <iostream>
 
 namespace GUI {
+    constexpr int CIRCLE_RES = 100;
+
     class Renderer {
     private:
-        const Game::GameState* m_state;
+        const GameState* m_state;
 
     public:
-        Renderer(const Game::GameState& state) : m_state {&state} { }
+        Renderer(const GameState& state) : m_state {&state} { }
 
         void RenderFrame(Window& window);
     };

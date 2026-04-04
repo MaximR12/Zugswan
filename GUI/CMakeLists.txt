@@ -1,7 +1,6 @@
 add_library(GUI STATIC)
 
 target_sources(GUI PRIVATE
-  src/Application.cpp
   src/Window.cpp
 )
 

@@ -1,5 +1,4 @@
 #include "Window.h"
-#include "Application.h"
 #include "GraphicsIncludes.h"
 
 using namespace GUI;
@@ -14,27 +13,27 @@ static void key_callback(GLFWwindow* window, int key, int scancode, int action, 
 }
 
 static void mouse_callback(GLFWwindow* window, int button, int action, int mods) {
-    Game::GameState* state = static_cast<Game::GameState*>(glfwGetWindowUserPointer(window)); 
+    GameState* state = static_cast<GameState*>(glfwGetWindowUserPointer(window)); 
 
-    switch(button) {
-        case(GLFW_MOUSE_BUTTON_1):
-            if(action == GLFW_PRESS) {
-                double xpos, ypos;
-                glfwGetCursorPos(window, &xpos, &ypos);
+    if(button != GLFW_MOUSE_BUTTON_1) {
+        return;
+    }
 
-                const int squares_per_side = 8;
-                const float boardX = GameDimensions.xPos, boardY = GameDimensions.yPos, boardLen = GameDimensions.len, squareLen = boardLen / squares_per_side;
-                int width, height;
-                glfwGetWindowSize(window, &width, &height);
+    if(action == GLFW_PRESS) {
+        double xpos, ypos;
+        glfwGetCursorPos(window, &xpos, &ypos);
 
-                int col = int(xpos / (squareLen * width / boardLen/2.0f)) - 4, row = int(ypos / (squareLen * height / boardLen/2.0f)) - 4;
-                
-                if(col >= 0 && row >= 0 && col < squares_per_side && row < squares_per_side) {
-                    // std::cout << "Mouse Clicked at: " << xpos << ", " << ypos << " which is in square: " << row << ", " << col << std::endl;
-                    state->handleClick(row, col);
-                }
-            }
-            break;
+        const int squares_per_side = 8;
+        const float boardX = GameDimensions.xPos, boardY = GameDimensions.yPos, boardLen = GameDimensions.len, squareLen = boardLen / squares_per_side;
+        int width, height;
+        glfwGetWindowSize(window, &width, &height);
+
+        const int col = int(xpos / (squareLen * width / boardLen/2.0f)) - 4, row = int(ypos / (squareLen * height / boardLen/2.0f)) - 4;
+        const int square = (7 - row) * 8 + col;
+        
+        if(col >= 0 && row >= 0 && col < squares_per_side && row < squares_per_side) {
+            state->handleClick(square);
+        }
     }
 }
 
@@ -46,7 +45,7 @@ static void framebuffer_size_callback(GLFWwindow* window, int width, int height)
     glViewport(0, 0, width, height);
 } 
 
-Window::Window(const char* title, int width, int height, Game::GameState* state) : m_windowInfo {title, width, height} {
+Window::Window(const char* title, int width, int height, GameState* state) : m_windowInfo {title, width, height} {
     glfwSetErrorCallback(error_callback);
 
     if(!glfwInit())
@@ -55,6 +54,7 @@ Window::Window(const char* title, int width, int height, Game::GameState* state)
     glfwWindowHint(GLFW_CONTEXT_VERSION_MAJOR, 3);
     glfwWindowHint(GLFW_CONTEXT_VERSION_MINOR, 3);
     glfwWindowHint(GLFW_OPENGL_PROFILE, GLFW_OPENGL_CORE_PROFILE);
+    glfwWindowHint(GLFW_RESIZABLE, GLFW_FALSE);
 
     m_window = glfwCreateWindow(m_windowInfo.width, m_windowInfo.height, m_windowInfo.title, NULL, NULL);
 
