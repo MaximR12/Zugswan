@@ -12,12 +12,12 @@ void GameState::makeMove(Move move) {
     uint64_t fromColorBB = m_board.getPieceSet(fromColor);
     uint64_t fromTypeBB = m_board.getPieceSet(fromType);
 
-    m_board.updateOccupiedBB(m_board.getOccupied() ^ fromToBB);
-    m_board.updateEmptyBB(~m_board.getOccupied());
-
     if(!move.isCapture()) {
         m_board.updateBB(fromColor, fromColorBB ^ fromToBB);
         m_board.updateBB(fromType, fromTypeBB ^ fromToBB);
+
+        m_board.updateOccupiedBB(m_board.getOccupied() ^ fromToBB);
+        m_board.updateEmptyBB(~m_board.getOccupied());
     } else {
         Board::PieceType captureColor = m_board.getPieceColor(toInd);
         Board::PieceType captureType = m_board.getPieceType(toInd);
@@ -28,6 +28,9 @@ void GameState::makeMove(Move move) {
         m_board.updateBB(fromType, fromTypeBB ^ fromToBB);
         m_board.updateBB(captureColor, captureColorBB ^ toBB); //remove captured piece
         m_board.updateBB(captureType, captureTypeBB ^ toBB);
+
+        m_board.updateOccupiedBB(m_board.getOccupied() ^ fromBB);
+        m_board.updateEmptyBB(~m_board.getOccupied());
     }
 }
 

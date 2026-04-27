@@ -5,6 +5,7 @@
 #include <array>
 #include <vector>
 #include <bit>
+#include <bitset>
 #include "stdint.h"
 
 /*
@@ -20,42 +21,44 @@ Board class encapsulating piece bitboards using little endian rank file mappings
 1  7  6  5  4  3  2  1  0   
 */
 
-    constexpr uint64_t UNIVERSE = 0xFFFFFFFFFFFFFFFFULL;
-    constexpr uint64_t EMPTY = 0x0000000000000000ULL;
+constexpr uint64_t UNIVERSE = 0xFFFFFFFFFFFFFFFFULL;
+constexpr uint64_t EMPTY = 0x0000000000000000ULL;
 
-    constexpr uint64_t RANK_1 = 0x00000000000000FFULL;
-    constexpr uint64_t RANK_2 = 0x000000000000FF00ULL;
-    constexpr uint64_t RANK_3 = 0x0000000000FF0000ULL;
-    constexpr uint64_t RANK_4 = 0x00000000FF000000ULL;
-    constexpr uint64_t RANK_5 = 0x000000FF00000000ULL;
-    constexpr uint64_t RANK_6 = 0x0000FF0000000000ULL;
-    constexpr uint64_t RANK_7 = 0x00FF000000000000ULL;
-    constexpr uint64_t RANK_8 = 0xFF00000000000000ULL;
+constexpr uint64_t RANK_1 = 0x00000000000000FFULL;
+constexpr uint64_t RANK_2 = 0x000000000000FF00ULL;
+constexpr uint64_t RANK_3 = 0x0000000000FF0000ULL;
+constexpr uint64_t RANK_4 = 0x00000000FF000000ULL;
+constexpr uint64_t RANK_5 = 0x000000FF00000000ULL;
+constexpr uint64_t RANK_6 = 0x0000FF0000000000ULL;
+constexpr uint64_t RANK_7 = 0x00FF000000000000ULL;
+constexpr uint64_t RANK_8 = 0xFF00000000000000ULL;
 
-    constexpr uint64_t NOT_A_FILE = 0xFEFEFEFEFEFEFEFEULL; 
-    constexpr uint64_t NOT_H_FILE = 0x7F7F7F7F7F7F7F7FULL;
+constexpr uint64_t NOT_A_FILE = 0xFEFEFEFEFEFEFEFEULL; 
+constexpr uint64_t NOT_AB_FILE = 0xFCFCFCFCFCFCFCFCULL; 
+constexpr uint64_t NOT_H_FILE = 0x7F7F7F7F7F7F7F7FULL;
+constexpr uint64_t NOT_GH_FILE = 0x3F3F3F3F3F3F3F3FULL;
 
-    constexpr uint64_t WHITE_KNIGHTS = 0x0000000000000042ULL; 
-    constexpr uint64_t BLACK_KNIGHTS = 0x4200000000000000ULL;
-    constexpr uint64_t WHITE_BISHOPS = 0x0000000000000024ULL; 
-    constexpr uint64_t BLACK_BISHOPS = 0x2400000000000000ULL;
-    constexpr uint64_t WHITE_ROOKS = 0x0000000000000081ULL; 
-    constexpr uint64_t BLACK_ROOKS = 0x8100000000000000ULL;    
-    constexpr uint64_t WHITE_QUEENS = 0x0000000000000008ULL; 
-    constexpr uint64_t BLACK_QUEENS = 0x0800000000000000ULL;
-    constexpr uint64_t WHITE_KING = 0x0000000000000010ULL; 
-    constexpr uint64_t BLACK_KING = 0x1000000000000000ULL;
+constexpr uint64_t WHITE_KNIGHTS = 0x0000000000000042ULL; 
+constexpr uint64_t BLACK_KNIGHTS = 0x4200000000000000ULL;
+constexpr uint64_t WHITE_BISHOPS = 0x0000000000000024ULL; 
+constexpr uint64_t BLACK_BISHOPS = 0x2400000000000000ULL;
+constexpr uint64_t WHITE_ROOKS = 0x0000000000000081ULL; 
+constexpr uint64_t BLACK_ROOKS = 0x8100000000000000ULL;    
+constexpr uint64_t WHITE_QUEENS = 0x0000000000000008ULL; 
+constexpr uint64_t BLACK_QUEENS = 0x0800000000000000ULL;
+constexpr uint64_t WHITE_KING = 0x0000000000000010ULL; 
+constexpr uint64_t BLACK_KING = 0x1000000000000000ULL;
 
-    constexpr int MAX_LEGAL_MOVES = 256;
-    constexpr int NUM_PIECE_TYPES = 14;
-    constexpr int NUM_SQUARES = 64;
-    constexpr int NUM_DIRECTIONS = 8;
-    constexpr int ROW_LEN = 8;
+constexpr int MAX_LEGAL_MOVES = 256;
+constexpr int NUM_PIECE_TYPES = 14;
+constexpr int NUM_SQUARES = 64;
+constexpr int NUM_TOTAL_DIRECTIONS = 16; //slider + knight directions
+constexpr int NUM_SLIDER_DIRECTIONS = 8;
+constexpr int NUM_KNIGHT_DIRECTIONS = 8;
+constexpr int ROW_LEN = 8;
 
 class Board {
 private:
-    void initMoveTables();
-
     std::array<uint64_t, NUM_PIECE_TYPES> m_pieceBB;
     uint64_t m_emptyBB;
     uint64_t m_occupiedBB;
@@ -64,10 +67,7 @@ private:
     std::array<uint64_t, NUM_SQUARES> m_blackPawnAttackTable;
     std::array<uint64_t, NUM_SQUARES> m_kingMoveTable;
     std::array<uint64_t, NUM_SQUARES> m_knightMoveTable;
-    std::array<uint64_t, NUM_SQUARES> m_bishopMoveTable;
-    std::array<uint64_t, NUM_SQUARES> m_rookMoveTable;
-    std::array<uint64_t, NUM_SQUARES> m_queenMoveTable;
-    std::array<std::array<uint64_t, NUM_SQUARES>, NUM_DIRECTIONS> m_rayAttackTable; 
+    std::array<std::array<uint64_t, NUM_SQUARES>, NUM_SLIDER_DIRECTIONS> m_rayAttackTable; 
 
 public:
     enum PieceType {
@@ -78,37 +78,19 @@ public:
     };
 
     enum Directions {
-        north, south, east, west, northWest, northEast, southWest, southEast
+        north, south, east, west, northWest, northEast, southWest, southEast, 
+        northNorthEast, northEastEast, northNorthWest, northWestWest,
+        southSouthEast, southEastEast, southSouthWest, southWestWest
     };
 
-    Board() {
-        m_pieceBB[whitePieces] = RANK_1 | RANK_2;
-        m_pieceBB[blackPieces] = RANK_7 | RANK_8;
-        m_pieceBB[whitePawns] = RANK_2; 
-        m_pieceBB[blackPawns] = RANK_7;
-        m_pieceBB[whiteKnights] = WHITE_KNIGHTS; 
-        m_pieceBB[blackKnights] = BLACK_KNIGHTS; 
-        m_pieceBB[whiteBishops] = WHITE_BISHOPS; 
-        m_pieceBB[blackBishops] = BLACK_BISHOPS; 
-        m_pieceBB[whiteRooks] = WHITE_ROOKS; 
-        m_pieceBB[blackRooks] = BLACK_ROOKS; 
-        m_pieceBB[whiteQueens] = WHITE_QUEENS; 
-        m_pieceBB[blackQueens] = BLACK_QUEENS; 
-        m_pieceBB[whiteKing] = WHITE_KING; 
-        m_pieceBB[blackKing] = BLACK_KING; 
-
-        m_occupiedBB = m_pieceBB[whitePieces] | m_pieceBB[blackPieces];
-        m_emptyBB = ~m_occupiedBB;
-    
-        initMoveTables();
-    };
+    Board();
 
     uint64_t getPieceSet(PieceType type) const { return m_pieceBB[type]; }
     uint64_t getOccupied() const { return m_occupiedBB; }
     uint64_t getEmpty() const { return m_emptyBB; }
 
-    uint64_t getWhitePawnAttacks(uint16_t ind) const { assert(ind >= ROW_LEN && ind < NUM_SQUARES-ROW_LEN); return m_whitePawnAttackTable[ind]; }
-    uint64_t getBlackPawnAttacks(uint16_t ind) const { assert(ind >= ROW_LEN && ind < NUM_SQUARES-ROW_LEN); return m_blackPawnAttackTable[ind]; }
+    uint64_t getWhitePawnAttacks(uint16_t ind) const { assert(ind >= 0 && ind < NUM_SQUARES); return m_whitePawnAttackTable[ind]; }
+    uint64_t getBlackPawnAttacks(uint16_t ind) const { assert(ind >= 0 && ind < NUM_SQUARES); return m_blackPawnAttackTable[ind]; }
     uint64_t getKingMoves(uint16_t ind) const { assert(ind >= 0 && ind < NUM_SQUARES); return m_kingMoveTable[ind]; }
     uint64_t getKnightMoves(uint16_t ind) const { assert(ind >= 0 && ind < NUM_SQUARES); return m_knightMoveTable[ind]; }
 
@@ -119,16 +101,112 @@ public:
     void updateOccupiedBB(uint64_t BB) { m_occupiedBB = BB; }
     void updateEmptyBB(uint64_t BB) { m_emptyBB = BB; }
 
+    static uint64_t getRayMoves(uint16_t ind, Directions dir);
+    static uint64_t knightAttackTargets(uint64_t BB);
+    static uint64_t kingAttackTargets(uint64_t BB);
+    static uint64_t wpAttackTargets(uint64_t BB);
+    static uint64_t bpAttackTargets(uint64_t BB);
+
+    //ray directions
     static uint64_t shiftSouth(uint64_t BB) { return (BB >> 8); }
     static uint64_t shiftNorth(uint64_t BB) { return (BB << 8); }
     static uint64_t shiftEast(uint64_t BB) { return (BB << 1) & NOT_A_FILE; }
-    static uint64_t shiftNortheast(uint64_t BB) { return (BB << 9) & NOT_A_FILE; }
-    static uint64_t shiftSoutheast(uint64_t BB) { return (BB >> 7) & NOT_A_FILE; }
+    static uint64_t shiftNorthEast(uint64_t BB) { return (BB << 9) & NOT_A_FILE; }
+    static uint64_t shiftSouthEast(uint64_t BB) { return (BB >> 7) & NOT_A_FILE; }
     static uint64_t shiftWest(uint64_t BB) { return (BB >> 1) & NOT_H_FILE; }
-    static uint64_t shiftNorthwest(uint64_t BB) { return (BB << 7) & NOT_H_FILE; }
-    static uint64_t shiftSouthwest(uint64_t BB) { return (BB >> 9) & NOT_H_FILE; }
+    static uint64_t shiftNorthWest(uint64_t BB) { return (BB << 7) & NOT_H_FILE; }
+    static uint64_t shiftSouthWest(uint64_t BB) { return (BB >> 9) & NOT_H_FILE; }
 
+    //knight directions
+    static uint64_t shiftNorthNorthEast(uint64_t BB) { return (BB << 17) & NOT_A_FILE; }
+    static uint64_t shiftNorthEastEast(uint64_t BB) { return (BB << 10) & NOT_AB_FILE; }
+    static uint64_t shiftNorthNorthWest(uint64_t BB) { return (BB << 15) & NOT_H_FILE; }
+    static uint64_t shiftNorthWestWest(uint64_t BB) { return (BB << 6) & NOT_GH_FILE; }
+    static uint64_t shiftSouthSouthEast(uint64_t BB) { return (BB >> 15) & NOT_A_FILE; }
+    static uint64_t shiftSouthEastEast(uint64_t BB) { return (BB >> 6) & NOT_AB_FILE; }
+    static uint64_t shiftSouthSouthWest(uint64_t BB) { return (BB >> 17) & NOT_H_FILE; }
+    static uint64_t shiftSouthWestWest(uint64_t BB) { return (BB >> 10) & NOT_GH_FILE; }
+
+    //fill each attack direction for sliders up to and including blockers
+    static uint64_t northFill(uint64_t sliders, uint64_t empty);
+    static uint64_t southFill(uint64_t sliders, uint64_t empty);
+    static uint64_t eastFill(uint64_t sliders, uint64_t empty);
+    static uint64_t westFill(uint64_t sliders, uint64_t empty);
+    static uint64_t northEastFill(uint64_t sliders, uint64_t empty);
+    static uint64_t northWestFill(uint64_t sliders, uint64_t empty);
+    static uint64_t southEastFill(uint64_t sliders, uint64_t empty);
+    static uint64_t southWestFill(uint64_t sliders, uint64_t empty);
+
+    static uint16_t getDirectionOffset(Directions dir);
+    static Directions getOppositeDirection(int dir);
+    static Directions getOppositeDirection(Directions dir);
+    static bool isNegative(Directions dir);
+
+    static uint16_t bitScan(uint64_t BB, bool reverse);
     static uint16_t bitScanForward(uint64_t BB) { assert(BB != 0); return std::countr_zero(BB); }
+    static uint16_t bitScanReverse(uint64_t BB) { assert(BB != 0); return 63 - std::countl_zero(BB); }
     static uint16_t serializeSingleBit(uint64_t BB) { return bitScanForward(BB); } //get square indices from bitboards
-    static uint16_t serializeBitboard(uint64_t BB, std::array<uint16_t, NUM_SQUARES>& indBuf);
+    static uint16_t serializeBitboard(uint64_t BB, std::array<uint16_t, NUM_SQUARES>& indBuf); //serialize into indBuf and return size
+
+    static void printBitBoard(uint64_t BB);
 };
+
+constexpr uint16_t northOffset = 8;
+constexpr uint16_t southOffset = -8;
+constexpr uint16_t eastOffset = 1;
+constexpr uint16_t westOffset = -1;
+constexpr uint16_t northEastOffset = 9;
+constexpr uint16_t northWestOffset = 7;
+constexpr uint16_t southEastOffset = -7;
+constexpr uint16_t southWestOffset = -9;
+
+constexpr uint16_t northNorthEastOffset = 17;
+constexpr uint16_t northEastEastOffset = 10;
+constexpr uint16_t northNorthWestOffset = 15;
+constexpr uint16_t northWestWestOffset = 6;
+constexpr uint16_t southSouthEastOffset = -15;
+constexpr uint16_t southEastEastOffset = -6;
+constexpr uint16_t southSouthWestOffset = -17;
+constexpr uint16_t southWestWestOffset = -10;
+
+inline consteval std::array<int16_t, NUM_TOTAL_DIRECTIONS> genDirectionOffsetTable() {
+    constexpr std::array<int16_t, NUM_TOTAL_DIRECTIONS> directionOffsets {
+        northOffset, southOffset, eastOffset, westOffset, northEastOffset, northWestOffset, 
+        southEastOffset, southEastOffset, northNorthEastOffset, northEastEastOffset, northNorthWestOffset,
+        northWestWestOffset, southSouthEastOffset, southEastEastOffset, southSouthWestOffset, southWestWestOffset
+    };
+
+    return directionOffsets;
+}
+
+inline consteval std::array<Board::Directions, NUM_TOTAL_DIRECTIONS> genOppositeDirectionTable() {
+    constexpr std::array<Board::Directions, NUM_TOTAL_DIRECTIONS> oppositeDirections {
+        Board::south, Board::north, Board::west, Board::east, Board::southEast, Board::southWest,
+        Board::northEast, Board::northWest, Board::southSouthWest, Board::southWestWest, Board::southSouthEast,
+        Board::southEastEast, Board::northNorthWest, Board::northWestWest, Board::northNorthEast, Board::northEastEast,
+    };
+
+    return oppositeDirections;
+}
+
+inline constinit const std::array<int16_t, NUM_TOTAL_DIRECTIONS> directionOffsetTable {genDirectionOffsetTable()}; 
+inline constinit const std::array<Board::Directions, NUM_TOTAL_DIRECTIONS> oppositeDirectionTable {genOppositeDirectionTable()}; 
+
+inline uint16_t Board::getDirectionOffset(Directions dir) { 
+    assert(dir >= 0 && dir <= NUM_TOTAL_DIRECTIONS);
+    return directionOffsetTable[dir];
+}
+
+inline Board::Directions Board::getOppositeDirection(Directions dir) {
+    assert(dir >= 0 && dir <= NUM_TOTAL_DIRECTIONS);
+    return oppositeDirectionTable[dir];
+}
+
+inline Board::Directions Board::getOppositeDirection(int dir) {
+    assert(dir >= 0 && dir <= NUM_TOTAL_DIRECTIONS);
+    return oppositeDirectionTable[dir];
+}
+
+inline bool Board::isNegative(Directions dir) {
+    return directionOffsetTable[dir] < 0;
+}
