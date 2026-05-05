@@ -1,25 +1,57 @@
 #include "Board.h"
 
-uint64_t Board::wpAttackTargets(uint64_t wPawns) {
+uint64_t Board::wpAttackTargetsSafe(uint64_t wPawns, uint64_t diagInBetween, uint64_t antiInBetween, uint64_t allInBetween) {
+    uint64_t pinSafe = wPawns & ~(allInBetween ^ diagInBetween);
+    uint64_t westAttacks = Board::shiftNorthWest(pinSafe);
+    pinSafe = wPawns & ~(allInBetween ^ antiInBetween);
+    uint64_t eastAttacks = Board::shiftNorthEast(pinSafe); 
+    return westAttacks | eastAttacks;
+}
+
+uint64_t Board::bpAttackTargetsSafe(uint64_t bPawns, uint64_t diagInBetween, uint64_t antiInBetween, uint64_t allInBetween) {
+    uint64_t pinSafe = bPawns & ~(allInBetween ^ antiInBetween);
+    uint64_t westAttacks = Board::shiftSouthWest(pinSafe);
+    pinSafe = bPawns & ~(allInBetween ^ diagInBetween);
+    uint64_t eastAttacks = Board::shiftSouthEast(pinSafe); 
+    return westAttacks | eastAttacks;
+}
+
+//maps to correct safe pawn attack func given north or south pawn direction
+constinit const std::array<uint64_t (*)(uint64_t, uint64_t, uint64_t, uint64_t), 2> pawnSafeAttackFuncMap { Board::wpAttackTargetsSafe, Board::bpAttackTargetsSafe };
+
+uint64_t Board::pawnAttackTargetsSafe(uint64_t pawns, Directions pawnDir, uint64_t diagInBetween, uint64_t antiInBetween, uint64_t allInBetween) { 
+    uint64_t (*func)(uint64_t, uint64_t, uint64_t, uint64_t) = pawnSafeAttackFuncMap[pawnDir];
+    return func(pawns, diagInBetween, antiInBetween, allInBetween);
+}
+
+uint64_t Board::whitePawnTargets(uint64_t wPawns) {
     uint64_t westAttacks = Board::shiftNorthWest(wPawns);
     uint64_t eastAttacks = Board::shiftNorthEast(wPawns); 
     return westAttacks | eastAttacks;
 }
 
-uint64_t Board::bpAttackTargets(uint64_t bPawns) {
+uint64_t Board::blackPawnTargets(uint64_t bPawns) {
     uint64_t westAttacks = Board::shiftSouthWest(bPawns);
     uint64_t eastAttacks = Board::shiftSouthEast(bPawns); 
     return westAttacks | eastAttacks;
 }
 
-void initPawnAttackTables(std::array<uint64_t, NUM_SQUARES>& whitePawnAttackTable, std::array<uint64_t, NUM_SQUARES>& blackPawnAttackTable) {
+//maps to correct pawn attack func given north or south pawn direction
+constinit const std::array<uint64_t (*)(uint64_t), 2> pawnAttackFuncMap { Board::whitePawnTargets, Board::blackPawnTargets };
+
+uint64_t Board::pawnAttackTargets(uint64_t pawns, Directions pawnDir) { 
+    uint64_t (*func)(uint64_t) = pawnAttackFuncMap[pawnDir];
+    return func(pawns);
+}
+
+void initPawnAttackTables(std::array<std::array<uint64_t, NUM_SQUARES>, 2>& pawnAttackTable) {
     uint64_t currBB = 1;
     for(int i = 0; i < NUM_SQUARES; ++i, currBB <<= 1) 
-        whitePawnAttackTable[i] = Board::wpAttackTargets(currBB);
+        pawnAttackTable[Board::whitePieces][i] = Board::whitePawnTargets(currBB);
 
     currBB = 1;
     for(int i = 0; i < NUM_SQUARES; ++i, currBB <<= 1) 
-        blackPawnAttackTable[i] = Board::bpAttackTargets(currBB);        
+        pawnAttackTable[Board::blackPieces][i] = Board::blackPawnTargets(currBB);        
 }   
 
 uint64_t Board::kingAttackTargets(uint64_t squareSet) {
@@ -152,8 +184,10 @@ Board::Board() {
 
     m_occupiedBB = m_pieceBB[whitePieces] | m_pieceBB[blackPieces];
     m_emptyBB = ~m_occupiedBB;
+    m_whiteEpTargets = 0ULL;
+    m_blackEpTargets = 0ULL;
 
-    initPawnAttackTables(m_whitePawnAttackTable, m_blackPawnAttackTable);
+    initPawnAttackTables(m_pawnAttackTable);
     initKnightMoveTable(m_knightMoveTable);
     initKingMoveTable(m_kingMoveTable);
 }

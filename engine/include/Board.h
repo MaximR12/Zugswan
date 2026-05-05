@@ -33,6 +33,8 @@ constexpr uint64_t RANK_6 = 0x0000FF0000000000ULL;
 constexpr uint64_t RANK_7 = 0x00FF000000000000ULL;
 constexpr uint64_t RANK_8 = 0xFF00000000000000ULL;
 
+constexpr uint64_t PAWN_RANK = RANK_2 | RANK_7;
+
 constexpr uint64_t NOT_A_FILE = 0xFEFEFEFEFEFEFEFEULL; 
 constexpr uint64_t NOT_AB_FILE = 0xFCFCFCFCFCFCFCFCULL; 
 constexpr uint64_t NOT_H_FILE = 0x7F7F7F7F7F7F7F7FULL;
@@ -49,6 +51,24 @@ constexpr uint64_t BLACK_QUEENS = 0x0800000000000000ULL;
 constexpr uint64_t WHITE_KING = 0x0000000000000010ULL; 
 constexpr uint64_t BLACK_KING = 0x1000000000000000ULL;
 
+constexpr uint16_t northOffset = 8;
+constexpr uint16_t southOffset = -8;
+constexpr uint16_t eastOffset = 1;
+constexpr uint16_t westOffset = -1;
+constexpr uint16_t northEastOffset = 9;
+constexpr uint16_t northWestOffset = 7;
+constexpr uint16_t southEastOffset = -7;
+constexpr uint16_t southWestOffset = -9;
+
+constexpr uint16_t northNorthEastOffset = 17;
+constexpr uint16_t northEastEastOffset = 10;
+constexpr uint16_t northNorthWestOffset = 15;
+constexpr uint16_t northWestWestOffset = 6;
+constexpr uint16_t southSouthEastOffset = -15;
+constexpr uint16_t southEastEastOffset = -6;
+constexpr uint16_t southSouthWestOffset = -17;
+constexpr uint16_t southWestWestOffset = -10;
+
 constexpr int MAX_LEGAL_MOVES = 256;
 constexpr int NUM_PIECE_TYPES = 14;
 constexpr int NUM_SQUARES = 64;
@@ -60,11 +80,12 @@ constexpr int ROW_LEN = 8;
 class Board {
 private:
     std::array<uint64_t, NUM_PIECE_TYPES> m_pieceBB;
+    uint64_t m_whiteEpTargets;
+    uint64_t m_blackEpTargets;
     uint64_t m_emptyBB;
     uint64_t m_occupiedBB;
 
-    std::array<uint64_t, NUM_SQUARES> m_whitePawnAttackTable;
-    std::array<uint64_t, NUM_SQUARES> m_blackPawnAttackTable;
+    std::array<std::array<uint64_t, NUM_SQUARES>, 2> m_pawnAttackTable;
     std::array<uint64_t, NUM_SQUARES> m_kingMoveTable;
     std::array<uint64_t, NUM_SQUARES> m_knightMoveTable;
     std::array<std::array<uint64_t, NUM_SQUARES>, NUM_SLIDER_DIRECTIONS> m_rayAttackTable; 
@@ -74,6 +95,7 @@ public:
         whitePieces, blackPieces, 
         whitePawns, whiteKnights, whiteBishops, whiteRooks, whiteQueens, whiteKing,
         blackPawns, blackKnights, blackBishops, blackRooks, blackQueens, blackKing,
+        all, pawns, knights, bishops, rooks, queens, king,
         invalid
     };
 
@@ -86,11 +108,12 @@ public:
     Board();
 
     uint64_t getPieceSet(PieceType type) const { return m_pieceBB[type]; }
+    uint64_t getBlackEpTargets() const { return m_blackEpTargets; }
+    uint64_t getWhiteEpTargets() const { return m_whiteEpTargets; }
     uint64_t getOccupied() const { return m_occupiedBB; }
     uint64_t getEmpty() const { return m_emptyBB; }
 
-    uint64_t getWhitePawnAttacks(uint16_t ind) const { assert(ind >= 0 && ind < NUM_SQUARES); return m_whitePawnAttackTable[ind]; }
-    uint64_t getBlackPawnAttacks(uint16_t ind) const { assert(ind >= 0 && ind < NUM_SQUARES); return m_blackPawnAttackTable[ind]; }
+    uint64_t getPawnSquareAttacks(uint16_t ind, PieceType color) const { assert(ind >= 0 && ind < NUM_SQUARES && color < 2); return m_pawnAttackTable[color][ind]; }
     uint64_t getKingMoves(uint16_t ind) const { assert(ind >= 0 && ind < NUM_SQUARES); return m_kingMoveTable[ind]; }
     uint64_t getKnightMoves(uint16_t ind) const { assert(ind >= 0 && ind < NUM_SQUARES); return m_knightMoveTable[ind]; }
 
@@ -98,14 +121,24 @@ public:
     PieceType getPieceType(uint16_t ind) const;
 
     void updateBB(PieceType type, uint64_t BB) { m_pieceBB[type] = BB; }
+    void updateBlackEpTargets(uint64_t BB) { m_blackEpTargets = BB; }
+    void updateWhiteEpTargets(uint64_t BB) { m_whiteEpTargets = BB; }
     void updateOccupiedBB(uint64_t BB) { m_occupiedBB = BB; }
     void updateEmptyBB(uint64_t BB) { m_emptyBB = BB; }
 
     static uint64_t getRayMoves(uint16_t ind, Directions dir);
     static uint64_t knightAttackTargets(uint64_t BB);
     static uint64_t kingAttackTargets(uint64_t BB);
-    static uint64_t wpAttackTargets(uint64_t BB);
-    static uint64_t bpAttackTargets(uint64_t BB);
+    static uint64_t whitePawnTargets(uint64_t BB);
+    static uint64_t blackPawnTargets(uint64_t BB);
+    static uint64_t pawnAttackTargets(uint64_t pawns, Directions pawnDir); 
+    static uint64_t wpAttackTargetsSafe(uint64_t BB, uint64_t diagInBetween, uint64_t antiInBetween, uint64_t allInBetween); //pin safe pawn attack targets
+    static uint64_t bpAttackTargetsSafe(uint64_t BB, uint64_t diagInBetween, uint64_t antiInBetween, uint64_t allInBetween);
+    static uint64_t pawnAttackTargetsSafe(uint64_t pawns, Directions pawnDir, uint64_t diagInBetween, uint64_t antiInBetween, uint64_t allInBetween); 
+    static uint64_t pawnShift(uint64_t BB, Directions dir);
+
+    static int64_t fullBoolMask(uint64_t BB) { return (int64_t)(BB | -BB) >> 63; }
+    static int64_t nullBoolMask(uint64_t BB) { return ((int64_t)(BB) - 1) >> 63; }
 
     //ray directions
     static uint64_t shiftSouth(uint64_t BB) { return (BB >> 8); }
@@ -151,24 +184,6 @@ public:
     static void printBitBoard(uint64_t BB);
 };
 
-constexpr uint16_t northOffset = 8;
-constexpr uint16_t southOffset = -8;
-constexpr uint16_t eastOffset = 1;
-constexpr uint16_t westOffset = -1;
-constexpr uint16_t northEastOffset = 9;
-constexpr uint16_t northWestOffset = 7;
-constexpr uint16_t southEastOffset = -7;
-constexpr uint16_t southWestOffset = -9;
-
-constexpr uint16_t northNorthEastOffset = 17;
-constexpr uint16_t northEastEastOffset = 10;
-constexpr uint16_t northNorthWestOffset = 15;
-constexpr uint16_t northWestWestOffset = 6;
-constexpr uint16_t southSouthEastOffset = -15;
-constexpr uint16_t southEastEastOffset = -6;
-constexpr uint16_t southSouthWestOffset = -17;
-constexpr uint16_t southWestWestOffset = -10;
-
 inline consteval std::array<int16_t, NUM_TOTAL_DIRECTIONS> genDirectionOffsetTable() {
     constexpr std::array<int16_t, NUM_TOTAL_DIRECTIONS> directionOffsets {
         northOffset, southOffset, eastOffset, westOffset, northEastOffset, northWestOffset, 
@@ -209,4 +224,9 @@ inline Board::Directions Board::getOppositeDirection(int dir) {
 
 inline bool Board::isNegative(Directions dir) {
     return directionOffsetTable[dir] < 0;
+}
+
+inline uint64_t Board::pawnShift(uint64_t BB, Directions dir) {
+    uint64_t negDirMask = 0ULL - static_cast<uint64_t>(isNegative(dir));
+    return (BB << directionOffsetTable[dir] & ~negDirMask) | (BB >> -directionOffsetTable[dir] & negDirMask);
 }

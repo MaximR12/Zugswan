@@ -21,7 +21,7 @@ constexpr uint16_t BISHOP_PROMOTION = 0x9;
 constexpr uint16_t ROOK_PROMOTION = 0xA;
 constexpr uint16_t QUEEN_PROMOTION = 0xB;
 constexpr uint16_t KNIGHT_PROMO_CAPTURE = 0xC;
-constexpr uint16_t BISHOP_PROMO_CAP = 0xD;
+constexpr uint16_t BISHOP_PROMO_CAPTURE = 0xD;
 constexpr uint16_t ROOK_PROMO_CAPTURE = 0xE;
 constexpr uint16_t QUEEN_PROMO_CAPTURE = 0xF;
 
