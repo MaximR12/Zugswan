@@ -40,4 +40,5 @@ public:
     uint16_t getFlag() const { return (m_move>>12)&0x0F; }
 
     bool isCapture() const { return getFlag()&CAPTURE; }
+    bool isPromotion() const { return getFlag()&0x8; }
 };

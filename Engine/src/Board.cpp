@@ -19,8 +19,8 @@ uint64_t Board::bpAttackTargetsSafe(uint64_t bPawns, uint64_t diagInBetween, uin
 //maps to correct safe pawn attack func given north or south pawn direction
 constinit const std::array<uint64_t (*)(uint64_t, uint64_t, uint64_t, uint64_t), 2> pawnSafeAttackFuncMap { Board::wpAttackTargetsSafe, Board::bpAttackTargetsSafe };
 
-uint64_t Board::pawnAttackTargetsSafe(uint64_t pawns, Directions pawnDir, uint64_t diagInBetween, uint64_t antiInBetween, uint64_t allInBetween) { 
-    uint64_t (*func)(uint64_t, uint64_t, uint64_t, uint64_t) = pawnSafeAttackFuncMap[pawnDir];
+uint64_t Board::pawnAttackTargetsSafe(uint64_t pawns, PieceColor color, uint64_t diagInBetween, uint64_t antiInBetween, uint64_t allInBetween) { 
+    uint64_t (*func)(uint64_t, uint64_t, uint64_t, uint64_t) = pawnSafeAttackFuncMap[color];
     return func(pawns, diagInBetween, antiInBetween, allInBetween);
 }
 
@@ -39,19 +39,19 @@ uint64_t Board::blackPawnTargets(uint64_t bPawns) {
 //maps to correct pawn attack func given north or south pawn direction
 constinit const std::array<uint64_t (*)(uint64_t), 2> pawnAttackFuncMap { Board::whitePawnTargets, Board::blackPawnTargets };
 
-uint64_t Board::pawnAttackTargets(uint64_t pawns, Directions pawnDir) { 
-    uint64_t (*func)(uint64_t) = pawnAttackFuncMap[pawnDir];
+uint64_t Board::pawnAttackTargets(uint64_t pawns, PieceColor color) { 
+    uint64_t (*func)(uint64_t) = pawnAttackFuncMap[color];
     return func(pawns);
 }
 
 void initPawnAttackTables(std::array<std::array<uint64_t, NUM_SQUARES>, 2>& pawnAttackTable) {
     uint64_t currBB = 1;
     for(int i = 0; i < NUM_SQUARES; ++i, currBB <<= 1) 
-        pawnAttackTable[Board::whitePieces][i] = Board::whitePawnTargets(currBB);
+        pawnAttackTable[Board::white][i] = Board::whitePawnTargets(currBB);
 
     currBB = 1;
     for(int i = 0; i < NUM_SQUARES; ++i, currBB <<= 1) 
-        pawnAttackTable[Board::blackPieces][i] = Board::blackPawnTargets(currBB);        
+        pawnAttackTable[Board::black][i] = Board::blackPawnTargets(currBB);        
 }   
 
 uint64_t Board::kingAttackTargets(uint64_t squareSet) {
@@ -167,25 +167,25 @@ uint64_t Board::getRayMoves(uint16_t ind, Directions dir) {
 } 
 
 Board::Board() {
-    m_pieceBB[whitePieces] = RANK_1 | RANK_2;
-    m_pieceBB[blackPieces] = RANK_7 | RANK_8;
-    m_pieceBB[whitePawns] = RANK_2; 
-    m_pieceBB[blackPawns] = RANK_7;
-    m_pieceBB[whiteKnights] = WHITE_KNIGHTS; 
-    m_pieceBB[blackKnights] = BLACK_KNIGHTS; 
-    m_pieceBB[whiteBishops] = WHITE_BISHOPS; 
-    m_pieceBB[blackBishops] = BLACK_BISHOPS; 
-    m_pieceBB[whiteRooks] = WHITE_ROOKS; 
-    m_pieceBB[blackRooks] = BLACK_ROOKS; 
-    m_pieceBB[whiteQueens] = WHITE_QUEENS; 
-    m_pieceBB[blackQueens] = BLACK_QUEENS; 
-    m_pieceBB[whiteKing] = WHITE_KING; 
-    m_pieceBB[blackKing] = BLACK_KING; 
+    m_pieceBB[white][all] = RANK_1 | RANK_2;
+    m_pieceBB[black][all] = RANK_7 | RANK_8;
+    m_pieceBB[white][pawns] = RANK_2; 
+    m_pieceBB[black][pawns] = RANK_7;
+    m_pieceBB[white][knights] = WHITE_KNIGHTS; 
+    m_pieceBB[black][knights] = BLACK_KNIGHTS; 
+    m_pieceBB[white][bishops] = WHITE_BISHOPS; 
+    m_pieceBB[black][bishops] = BLACK_BISHOPS; 
+    m_pieceBB[white][rooks] = WHITE_ROOKS; 
+    m_pieceBB[black][rooks] = BLACK_ROOKS; 
+    m_pieceBB[white][queens] = WHITE_QUEENS; 
+    m_pieceBB[black][queens] = BLACK_QUEENS; 
+    m_pieceBB[white][king] = WHITE_KING; 
+    m_pieceBB[black][king] = BLACK_KING; 
 
-    m_occupiedBB = m_pieceBB[whitePieces] | m_pieceBB[blackPieces];
+    m_occupiedBB = m_pieceBB[white][all] | m_pieceBB[black][all];
     m_emptyBB = ~m_occupiedBB;
-    m_whiteEpTargets = 0ULL;
-    m_blackEpTargets = 0ULL;
+    m_enPassantTargets[white] = EMPTY;
+    m_enPassantTargets[black] = EMPTY;
 
     initPawnAttackTables(m_pawnAttackTable);
     initKnightMoveTable(m_knightMoveTable);
@@ -198,7 +198,7 @@ uint64_t Board::northFill(uint64_t sliders, uint64_t empty) {
     sliders |= empty & (sliders << 16);
     empty &= empty << 16;
     sliders |= empty & (sliders << 32);
-    return Board::shiftNorth(sliders);
+    return shiftNorth(sliders);
 }
 
 uint64_t Board::southFill(uint64_t sliders, uint64_t empty) {
@@ -207,7 +207,7 @@ uint64_t Board::southFill(uint64_t sliders, uint64_t empty) {
     sliders |= empty & (sliders >> 16);
     empty &= empty >> 16;
     sliders |= empty & (sliders >> 32);
-    return Board::shiftSouth(sliders);
+    return shiftSouth(sliders);
 }
 
 uint64_t Board::eastFill(uint64_t sliders, uint64_t empty) {
@@ -217,7 +217,7 @@ uint64_t Board::eastFill(uint64_t sliders, uint64_t empty) {
     sliders |= empty & (sliders << 2);
     empty &= empty << 2;
     sliders |= empty & (sliders << 4);
-    return Board::shiftEast(sliders);
+    return shiftEast(sliders);
 }
 
 uint64_t Board::westFill(uint64_t sliders, uint64_t empty) {
@@ -227,7 +227,7 @@ uint64_t Board::westFill(uint64_t sliders, uint64_t empty) {
     sliders |= empty & (sliders >> 2);
     empty &= empty >> 2;
     sliders |= empty & (sliders >> 4);
-    return Board::shiftWest(sliders);
+    return shiftWest(sliders);
 }
 
 uint64_t Board::northEastFill(uint64_t sliders, uint64_t empty) {
@@ -237,7 +237,7 @@ uint64_t Board::northEastFill(uint64_t sliders, uint64_t empty) {
     sliders |= empty & (sliders << 18);
     empty &= empty << 18;
     sliders |= empty & (sliders << 36);
-    return Board::shiftNorthEast(sliders);
+    return shiftNorthEast(sliders);
 }
 
 uint64_t Board::northWestFill(uint64_t sliders, uint64_t empty) {
@@ -247,7 +247,7 @@ uint64_t Board::northWestFill(uint64_t sliders, uint64_t empty) {
     sliders |= empty & (sliders << 14);
     empty &= empty << 14;
     sliders |= empty & (sliders << 28);
-    return Board::shiftNorthWest(sliders);
+    return shiftNorthWest(sliders);
 }
 
 uint64_t Board::southEastFill(uint64_t sliders, uint64_t empty) {
@@ -257,7 +257,7 @@ uint64_t Board::southEastFill(uint64_t sliders, uint64_t empty) {
     sliders |= empty & (sliders >> 14);
     empty &= empty >> 14;
     sliders |= empty & (sliders >> 28);
-    return Board::shiftSouthEast(sliders);
+    return shiftSouthEast(sliders);
 }
 
 uint64_t Board::southWestFill(uint64_t sliders, uint64_t empty) {
@@ -267,32 +267,25 @@ uint64_t Board::southWestFill(uint64_t sliders, uint64_t empty) {
     sliders |= empty & (sliders >> 18);
     empty &= empty >> 18;
     sliders |= empty & (sliders >> 36);
-    return Board::shiftSouthWest(sliders);
+    return shiftSouthWest(sliders);
 }
 
 Board::PieceType Board::getPieceType(uint16_t ind) const {
     assert(ind >= 0 && ind < NUM_SQUARES); 
 
-    PieceType color = this->getPieceColor(ind);
-    if(color == whitePieces) {
-        for(int curPieceSet = whitePawns; curPieceSet <= whiteKing; ++curPieceSet) { //loop over white piece bitboards
-            if(m_pieceBB[curPieceSet]&(1ULL<<ind))
-                return static_cast<PieceType>(curPieceSet);
-        }   
-    } else {
-        for(int curPieceSet = blackPawns; curPieceSet <= blackKing; ++curPieceSet) { //loop over black piece bitboards
-            if(m_pieceBB[curPieceSet]&(1ULL<<ind))
-                return static_cast<PieceType>(curPieceSet);
-        }   
-    }
+    PieceColor color = this->getPieceColor(ind);
+    for(int curPieceSet = pawns; curPieceSet <= king; ++curPieceSet) { //loop over all piece types
+        if(m_pieceBB[color][curPieceSet]&(1ULL<<ind))
+            return static_cast<PieceType>(curPieceSet);
+    }   
 
     return invalid;
 }
 
 uint16_t Board::bitScan(uint64_t BB, bool reverse) {
     assert(BB != 0);
-    uint64_t rMask = -(uint64_t)reverse;
-    BB &= -BB | rMask;
+    uint64_t rMask = 0ULL - static_cast<uint64_t>(reverse);
+    BB &= (0ULL-BB) | rMask;
     return bitScanReverse(BB);
 }
 
