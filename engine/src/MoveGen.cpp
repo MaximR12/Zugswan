@@ -116,7 +116,7 @@ void appendKnightMoves(std::array<uint64_t, NUM_TOTAL_DIRECTIONS>& moveTargets, 
 }
 
 void appendPawnMoves(std::array<uint64_t, NUM_TOTAL_DIRECTIONS>& moveTargets, uint64_t pawns, Board::Directions pawnDir, uint64_t oppPieces, uint64_t epAttackTargets,
-      uint64_t verInBetween, uint64_t diagInBetween, uint64_t antiInBetween, uint64_t allInBetween, uint64_t empty, uint64_t checkMask) 
+      uint64_t verInBetween, uint64_t diagInBetween, uint64_t antiInBetween, uint64_t allInBetween, uint64_t empty, uint64_t checkMask, Board::PieceColor color) 
 {
    uint64_t pinSafe = pawns & ~(allInBetween ^ antiInBetween);
    uint64_t singlePushTargets = Board::pawnShift(pinSafe, pawnDir) & empty;
@@ -125,7 +125,7 @@ void appendPawnMoves(std::array<uint64_t, NUM_TOTAL_DIRECTIONS>& moveTargets, ui
    uint64_t doublePushTargets = Board::pawnShift(pinSafe & PAWN_RANK, pawnDir) & empty;
    moveTargets[pawnDir] |= Board::pawnShift(doublePushTargets, pawnDir) & empty & checkMask;
 
-   uint64_t pawnAttackTargets = Board::pawnAttackTargetsSafe(pawns, pawnDir, diagInBetween, antiInBetween, allInBetween) & (oppPieces | epAttackTargets);
+   uint64_t pawnAttackTargets = Board::pawnAttackTargetsSafe(pawns, color, diagInBetween, antiInBetween, allInBetween) & (oppPieces | epAttackTargets);
    moveTargets[Board::northEast] |= pawnAttackTargets & Board::shiftNorthEast(pawns) & checkMask;
    moveTargets[Board::northWest] |= pawnAttackTargets & Board::shiftNorthWest(pawns) & checkMask;
    moveTargets[Board::southEast] |= pawnAttackTargets & Board::shiftSouthEast(pawns) & checkMask;
@@ -169,12 +169,12 @@ uint16_t getFlag(uint16_t from, uint16_t to, uint64_t pawns, uint64_t oppPieces,
    int64_t nullIfCapture = ((int64_t)((1ULL << to) & oppPieces) - 1) >> 63;
    flag |= CAPTURE & ~nullIfCapture;
 
-   // uint64_t fromIfPawn = fromBB & pawns;
-   // int64_t pawnMask = Board::fullBoolMask(fromIfPawn);
+   uint64_t fromIfPawn = fromBB & pawns;
+   int64_t pawnMask = Board::fullBoolMask(fromIfPawn);
 
-   // uint64_t nonZeroIfDoublePush = ((toBB << 16) & fromBB) | ((toBB >> 16) & fromBB);
-   // flag |= DOUBLE_PAWN_PUSH & Board::fullBoolMask(nonZeroIfDoublePush) & pawnMask;
-   // flag |= EP_CAPTURE & Board::fullBoolMask(to & epTargets) & pawnMask;
+   uint64_t nonZeroIfDoublePush = ((toBB << 16) & fromBB) | ((toBB >> 16) & fromBB);
+   flag |= DOUBLE_PAWN_PUSH & Board::fullBoolMask(nonZeroIfDoublePush) & pawnMask;
+   flag |= EP_CAPTURE & Board::fullBoolMask(toBB & epTargets) & pawnMask;
 
    return flag;
 }
@@ -207,45 +207,26 @@ void serializeMoves(std::vector<Move>& moves, std::array<uint64_t, NUM_TOTAL_DIR
 }
 
 //Dirgolem move generation, generate 16 move target bitboards for each direction, then serialize into moves
-std::vector<Move> MoveGen::getLegalMoves(Turn turn) {
+std::vector<Move> MoveGen::getLegalMoves(Board::PieceColor color) {
    std::array<uint64_t, NUM_TOTAL_DIRECTIONS> moveTargets;
 
-   Board::PieceType pieceColor;
-   Board::Directions pawnDir, oppPawnDir;
-   uint64_t pieces, king, pawns, rookLike, bishopLike, knights, oppPieces, epAttackTargets, oppKing, oppPawns, oppKnights, oppRookLike, oppBishopLike;
-   if(turn == Turn::WHITE) {
-      pieceColor = Board::whitePieces;
-      pawnDir = Board::north, oppPawnDir = Board::south;
-      pieces = m_board->getPieceSet(Board::whitePieces);
-      king = m_board->getPieceSet(Board::whiteKing);
-      pawns = m_board->getPieceSet(Board::whitePawns);
-      rookLike = m_board->getPieceSet(Board::whiteRooks) | m_board->getPieceSet(Board::whiteQueens);
-      bishopLike = m_board->getPieceSet(Board::whiteBishops) | m_board->getPieceSet(Board::whiteQueens);
-      knights = m_board->getPieceSet(Board::whiteKnights);
-      oppPieces = m_board->getPieceSet(Board::blackPieces);
-      epAttackTargets = m_board->getWhiteEpTargets();
-      oppKing = m_board->getPieceSet(Board::blackKing);
-      oppPawns = m_board->getPieceSet(Board::blackPawns);
-      oppKnights = m_board->getPieceSet(Board::blackKnights);
-      oppRookLike = m_board->getPieceSet(Board::blackRooks) | m_board->getPieceSet(Board::blackQueens);
-      oppBishopLike = m_board->getPieceSet(Board::blackBishops) | m_board->getPieceSet(Board::blackQueens);
-   } else {
-      pieceColor = Board::blackPieces;
-      pawnDir = Board::south, oppPawnDir = Board::north;
-      pieces = m_board->getPieceSet(Board::blackPieces);
-      king = m_board->getPieceSet(Board::blackKing);
-      pawns = m_board->getPieceSet(Board::blackPawns);
-      rookLike = m_board->getPieceSet(Board::blackRooks) | m_board->getPieceSet(Board::blackQueens);
-      bishopLike = m_board->getPieceSet(Board::PieceType::blackBishops) | m_board->getPieceSet(Board::blackQueens);
-      knights = m_board->getPieceSet(Board::blackKnights);
-      oppPieces = m_board->getPieceSet(Board::whitePieces);
-      epAttackTargets = m_board->getBlackEpTargets();
-      oppKing = m_board->getPieceSet(Board::whiteKing);
-      oppPawns = m_board->getPieceSet(Board::whitePawns);
-      oppKnights = m_board->getPieceSet(Board::whiteKnights);
-      oppRookLike = m_board->getPieceSet(Board::whiteRooks) | m_board->getPieceSet(Board::whiteQueens);
-      oppBishopLike = m_board->getPieceSet(Board::whiteBishops) | m_board->getPieceSet(Board::whiteQueens);
-   }
+   Board::PieceColor oppColor = Board::getOppositeColor(color);
+   Board::Directions pawnDir = Board::getPawnDirection(color);
+   Board::Directions oppPawnDir = Board::getPawnDirection(oppColor);
+
+   uint64_t pieces = m_board->getPieceSet(Board::all, color);
+   uint64_t king = m_board->getPieceSet(Board::king, color);
+   uint64_t pawns = m_board->getPieceSet(Board::pawns, color);
+   uint64_t rookLike = m_board->getPieceSet(Board::rooks, color) | m_board->getPieceSet(Board::queens, color);
+   uint64_t bishopLike = m_board->getPieceSet(Board::bishops, color) | m_board->getPieceSet(Board::queens, color);
+   uint64_t knights = m_board->getPieceSet(Board::knights, color);
+   uint64_t epAttackTargets = m_board->getEnPassantTargets(color);
+   uint64_t oppPieces = m_board->getPieceSet(Board::all, oppColor);
+   uint64_t oppKing = m_board->getPieceSet(Board::king, oppColor);
+   uint64_t oppPawns = m_board->getPieceSet(Board::pawns, oppColor);
+   uint64_t oppKnights = m_board->getPieceSet(Board::knights, oppColor);
+   uint64_t oppRookLike = m_board->getPieceSet(Board::rooks, oppColor) | m_board->getPieceSet(Board::queens, oppColor);
+   uint64_t oppBishopLike = m_board->getPieceSet(Board::bishops, oppColor) | m_board->getPieceSet(Board::queens, oppColor);
 
    uint16_t kingInd = Board::serializeSingleBit(king);
    uint64_t empty = m_board->getEmpty();
@@ -256,14 +237,14 @@ std::vector<Move> MoveGen::getLegalMoves(Turn turn) {
    uint64_t diagSliderAttacks = getDiagSliderAttacks(oppBishopLike, king, empty);
    uint64_t antiSliderAttacks = getAntiSliderAttacks(oppBishopLike, king, empty);
 
-   uint64_t oppSliderNorth = Board::northFill(oppRookLike, empty & king);
-   uint64_t oppSliderSouth = Board::southFill(oppRookLike, empty & king);
-   uint64_t oppSliderEast = Board::eastFill(oppRookLike, empty & king);
-   uint64_t oppSliderWest = Board::westFill(oppRookLike, empty & king);
-   uint64_t oppSliderNorthEast = Board::northEastFill(oppBishopLike, empty & king);
-   uint64_t oppSliderNorthWest = Board::northWestFill(oppBishopLike, empty & king);
-   uint64_t oppSliderSouthEast = Board::southEastFill(oppBishopLike, empty & king);
-   uint64_t oppSliderSouthWest = Board::southWestFill(oppBishopLike, empty & king);
+   uint64_t oppSliderNorth = Board::northFill(oppRookLike, empty | king);
+   uint64_t oppSliderSouth = Board::southFill(oppRookLike, empty | king);
+   uint64_t oppSliderEast = Board::eastFill(oppRookLike, empty | king);
+   uint64_t oppSliderWest = Board::westFill(oppRookLike, empty | king);
+   uint64_t oppSliderNorthEast = Board::northEastFill(oppBishopLike, empty | king);
+   uint64_t oppSliderNorthWest = Board::northWestFill(oppBishopLike, empty | king);
+   uint64_t oppSliderSouthEast = Board::southEastFill(oppBishopLike, empty | king);
+   uint64_t oppSliderSouthWest = Board::southWestFill(oppBishopLike, empty | king);
 
    uint64_t kingNorth = Board::northFill(king, empty);
    uint64_t kingSouth = Board::southFill(king, empty);
@@ -287,8 +268,8 @@ std::vector<Move> MoveGen::getLegalMoves(Turn turn) {
    uint64_t kingSuperDiag = kingNorthEast | kingNorthWest | kingSouthEast | kingSouthWest;
    uint64_t allInBetween = horInBetween | verInBetween | diagInBetween | antiInBetween;
 
-   uint64_t oppPawnAttacks = Board::pawnAttackTargets(oppPawns, oppPawnDir);
-   uint64_t pawnCheckFrom = m_board->getPawnSquareAttacks(kingInd, pieceColor) & oppPawns;
+   uint64_t oppPawnAttacks = Board::pawnAttackTargets(oppPawns, oppColor);
+   uint64_t pawnCheckFrom = m_board->getPawnSquareAttacks(kingInd, color) & oppPawns;
 
    uint64_t oppAnyAttacks = oppPawnAttacks | horSliderAttacks | verSliderAttacks | diagSliderAttacks | antiSliderAttacks 
          | Board::knightAttackTargets(oppKnights) | Board::kingAttackTargets(oppKing);
@@ -297,8 +278,8 @@ std::vector<Move> MoveGen::getLegalMoves(Turn turn) {
    uint64_t checkFrom = (kingSuperOrth & oppRookLike) | (kingSuperDiag & oppBishopLike) 
          | pawnCheckFrom | (m_board->getKnightMoves(kingInd) & oppKnights);
 
-   int64_t nullIfCheck = ((int64_t)(oppAnyAttacks & king) - 1) >> 63;
-   int64_t nullIfDoubleCheck = ((int64_t)(checkFrom & (checkFrom - 1)) - 1) >> 63;
+   int64_t nullIfCheck = Board::nullBoolMask(oppAnyAttacks & king);
+   int64_t nullIfDoubleCheck = Board::nullBoolMask(checkFrom & (checkFrom - 1));
    uint64_t checkTo = checkFrom | blocks | nullIfCheck;
    uint64_t checkMask = ~pieces & checkTo & nullIfDoubleCheck;
 
@@ -307,7 +288,7 @@ std::vector<Move> MoveGen::getLegalMoves(Turn turn) {
    appendDiagSliderMoves(moveTargets, diagInBetween, allInBetween, bishopLike, empty, checkMask);
    appendAntiSliderMoves(moveTargets, antiInBetween, allInBetween, bishopLike, empty, checkMask);
    appendKnightMoves(moveTargets, knights, allInBetween, checkMask);
-   appendPawnMoves(moveTargets, pawns, pawnDir, oppPieces, epAttackTargets, verInBetween, diagInBetween, antiInBetween, allInBetween, empty, checkMask);
+   appendPawnMoves(moveTargets, pawns, pawnDir, oppPieces, epAttackTargets, verInBetween, diagInBetween, antiInBetween, allInBetween, empty, checkMask, color);
    appendKingMoves(moveTargets, pieces, king, oppAnyAttacks);
 
    std::vector<Move> moves;

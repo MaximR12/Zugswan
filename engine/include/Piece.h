@@ -1,45 +1,39 @@
 #pragma once
 
+#include "Board.h"
+
 #include <iostream>
 #include <string>
 
-enum class PieceColor {
-    LIGHT, DARK
-};
-
-enum class PieceType {
-    PAWN, ROOK, KNIGHT, BISHOP, QUEEN, KING
-};
-
 class Piece {
 private:
-    const PieceColor m_color;
-    const PieceType m_type;
+    const Board::PieceColor m_color;
+    const Board::PieceType m_type;
 
     const int m_row;
     const int m_col;
 
     const std::string path;
     std::string initPath() {
-        std::string colorStr = m_color == PieceColor::LIGHT ? "l" : "d";
+        std::string colorStr = m_color == Board::white ? "l" : "d";
         std::string typeStr;
         switch(m_type) {
-            case PieceType::PAWN:
+            case Board::pawns:
                 typeStr = "p";
                 break;
-            case PieceType::ROOK:
+            case Board::rooks:
                 typeStr = "r";
                 break;
-            case PieceType::KNIGHT:
+            case Board::knights:
                 typeStr = "n";
                 break;
-            case PieceType::BISHOP:
+            case Board::bishops:
                 typeStr = "b";
                 break;
-            case PieceType::QUEEN:
+            case Board::queens:
                 typeStr = "q";
                 break;
-            case PieceType::KING:
+            case Board::king:
                 typeStr = "k";
                 break;
         }
@@ -48,10 +42,10 @@ private:
     }
 
 public:
-    Piece(const PieceColor& color, const PieceType& type, int row, int col) : m_color{color}, m_type{type}, path{initPath()}, m_row{row}, m_col{col} { }
+    Piece(const Board::PieceColor& color, const Board::PieceType& type, int row, int col) : m_color{color}, m_type{type}, path{initPath()}, m_row{row}, m_col{col} { }
 
-    const PieceColor& getColor() const { return m_color; }
-    const PieceType& getType() const { return m_type; }
+    const Board::PieceColor& getColor() const { return m_color; }
+    const Board::PieceType& getType() const { return m_type; }
     const std::string& getPath() const { return path; }
 
     const int getRow() const { return m_row; }

@@ -12,8 +12,8 @@ constexpr int UNDEFINED_SQUARE = 65;
 
 class GameState {
 private:
-    const Turn m_playerTurn;
-    Turn m_turn;
+    const Board::PieceColor m_playerTurn;
+    Board::PieceColor m_turn;
     Board m_board;
     MoveGen m_moveGen;
     Engine m_engine;
@@ -25,7 +25,7 @@ private:
     uint64_t m_highlightedSquares;
     
 public:
-    GameState() : m_board{}, m_playerTurn{Turn::WHITE}, m_turn{Turn::WHITE}, m_moveGen{&m_board}, m_engine{&m_board, &m_moveGen}, m_currLegalMoves{}, m_selectedSquare{UNDEFINED_SQUARE} { 
+    GameState() : m_board{}, m_playerTurn{Board::white}, m_turn{Board::white}, m_moveGen{&m_board}, m_engine{&m_board, &m_moveGen}, m_currLegalMoves{}, m_selectedSquare{UNDEFINED_SQUARE} { 
         m_currLegalMoves.reserve(MAX_LEGAL_MOVES); 
         m_currLegalMoves = m_moveGen.getLegalMoves(m_playerTurn); 
     }
@@ -33,9 +33,9 @@ public:
     void makeMove(Move move);
     void unMakeMove(Move move);
 
-    void switchTurn() { m_turn = m_turn == Turn::WHITE ? Turn::BLACK : Turn::WHITE; }
-    const Turn getTurn() { return m_turn; }
-    const Turn playerTurn() { return m_playerTurn; }
+    void switchTurn() { m_turn = Board::getOppositeColor(m_turn); }
+    const Board::PieceColor getTurn() { return m_turn; }
+    const Board::PieceColor playerTurn() { return m_playerTurn; }
 
     void playEngineMove();
 

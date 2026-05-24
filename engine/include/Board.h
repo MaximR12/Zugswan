@@ -39,6 +39,7 @@ constexpr uint64_t NOT_A_FILE = 0xFEFEFEFEFEFEFEFEULL;
 constexpr uint64_t NOT_AB_FILE = 0xFCFCFCFCFCFCFCFCULL; 
 constexpr uint64_t NOT_H_FILE = 0x7F7F7F7F7F7F7F7FULL;
 constexpr uint64_t NOT_GH_FILE = 0x3F3F3F3F3F3F3F3FULL;
+constexpr uint64_t NOT_LAST_RANK = 0x00FFFFFFFFFFFF00ULL;
 
 constexpr uint64_t WHITE_KNIGHTS = 0x0000000000000042ULL; 
 constexpr uint64_t BLACK_KNIGHTS = 0x4200000000000000ULL;
@@ -70,7 +71,7 @@ constexpr uint16_t southSouthWestOffset = -17;
 constexpr uint16_t southWestWestOffset = -10;
 
 constexpr int MAX_LEGAL_MOVES = 256;
-constexpr int NUM_PIECE_TYPES = 14;
+constexpr int NUM_PIECE_TYPES = 8;
 constexpr int NUM_SQUARES = 64;
 constexpr int NUM_TOTAL_DIRECTIONS = 16; //slider + knight directions
 constexpr int NUM_SLIDER_DIRECTIONS = 8;
@@ -79,9 +80,8 @@ constexpr int ROW_LEN = 8;
 
 class Board {
 private:
-    std::array<uint64_t, NUM_PIECE_TYPES> m_pieceBB;
-    uint64_t m_whiteEpTargets;
-    uint64_t m_blackEpTargets;
+    std::array<std::array<uint64_t, NUM_PIECE_TYPES>, 2> m_pieceBB;
+    std::array<uint64_t, 2> m_enPassantTargets;
     uint64_t m_emptyBB;
     uint64_t m_occupiedBB;
 
@@ -91,10 +91,11 @@ private:
     std::array<std::array<uint64_t, NUM_SQUARES>, NUM_SLIDER_DIRECTIONS> m_rayAttackTable; 
 
 public:
+    enum PieceColor {
+        white, black
+    };
+
     enum PieceType {
-        whitePieces, blackPieces, 
-        whitePawns, whiteKnights, whiteBishops, whiteRooks, whiteQueens, whiteKing,
-        blackPawns, blackKnights, blackBishops, blackRooks, blackQueens, blackKing,
         all, pawns, knights, bishops, rooks, queens, king,
         invalid
     };
@@ -107,22 +108,20 @@ public:
 
     Board();
 
-    uint64_t getPieceSet(PieceType type) const { return m_pieceBB[type]; }
-    uint64_t getBlackEpTargets() const { return m_blackEpTargets; }
-    uint64_t getWhiteEpTargets() const { return m_whiteEpTargets; }
+    uint64_t getPieceSet(PieceType type, PieceColor color) const { return m_pieceBB[color][type]; }
+    uint64_t getEnPassantTargets(PieceColor color) const { return m_enPassantTargets[color]; }
     uint64_t getOccupied() const { return m_occupiedBB; }
     uint64_t getEmpty() const { return m_emptyBB; }
 
-    uint64_t getPawnSquareAttacks(uint16_t ind, PieceType color) const { assert(ind >= 0 && ind < NUM_SQUARES && color < 2); return m_pawnAttackTable[color][ind]; }
+    uint64_t getPawnSquareAttacks(uint16_t ind, PieceColor color) const { assert(ind >= 0 && ind < NUM_SQUARES && color < 2); return m_pawnAttackTable[color][ind]; }
     uint64_t getKingMoves(uint16_t ind) const { assert(ind >= 0 && ind < NUM_SQUARES); return m_kingMoveTable[ind]; }
     uint64_t getKnightMoves(uint16_t ind) const { assert(ind >= 0 && ind < NUM_SQUARES); return m_knightMoveTable[ind]; }
 
-    PieceType getPieceColor(uint16_t ind) const { assert(ind >= 0 && ind < NUM_SQUARES); return m_pieceBB[whitePieces]&(1ULL<<ind) ? whitePieces : blackPieces; }
+    PieceColor getPieceColor(uint16_t ind) const { assert(ind >= 0 && ind < NUM_SQUARES); return m_pieceBB[white][all]&(1ULL<<ind) ? white : black; }
     PieceType getPieceType(uint16_t ind) const;
 
-    void updateBB(PieceType type, uint64_t BB) { m_pieceBB[type] = BB; }
-    void updateBlackEpTargets(uint64_t BB) { m_blackEpTargets = BB; }
-    void updateWhiteEpTargets(uint64_t BB) { m_whiteEpTargets = BB; }
+    void updateBB(PieceType type, PieceColor color, uint64_t BB) { m_pieceBB[color][type] = BB; }
+    void updateEnPassantTargets(PieceColor color, uint64_t BB) { m_enPassantTargets[color] = BB; }
     void updateOccupiedBB(uint64_t BB) { m_occupiedBB = BB; }
     void updateEmptyBB(uint64_t BB) { m_emptyBB = BB; }
 
@@ -131,14 +130,14 @@ public:
     static uint64_t kingAttackTargets(uint64_t BB);
     static uint64_t whitePawnTargets(uint64_t BB);
     static uint64_t blackPawnTargets(uint64_t BB);
-    static uint64_t pawnAttackTargets(uint64_t pawns, Directions pawnDir); 
+    static uint64_t pawnAttackTargets(uint64_t pawns, PieceColor color); 
     static uint64_t wpAttackTargetsSafe(uint64_t BB, uint64_t diagInBetween, uint64_t antiInBetween, uint64_t allInBetween); //pin safe pawn attack targets
     static uint64_t bpAttackTargetsSafe(uint64_t BB, uint64_t diagInBetween, uint64_t antiInBetween, uint64_t allInBetween);
-    static uint64_t pawnAttackTargetsSafe(uint64_t pawns, Directions pawnDir, uint64_t diagInBetween, uint64_t antiInBetween, uint64_t allInBetween); 
+    static uint64_t pawnAttackTargetsSafe(uint64_t pawns, PieceColor color, uint64_t diagInBetween, uint64_t antiInBetween, uint64_t allInBetween); 
     static uint64_t pawnShift(uint64_t BB, Directions dir);
 
-    static int64_t fullBoolMask(uint64_t BB) { return (int64_t)(BB | -BB) >> 63; }
-    static int64_t nullBoolMask(uint64_t BB) { return ((int64_t)(BB) - 1) >> 63; }
+    static int64_t fullBoolMask(uint64_t BB) { return 0ULL - static_cast<uint64_t>(BB != 0); }
+    static int64_t nullBoolMask(uint64_t BB) { return 0ULL - static_cast<uint64_t>(BB == 0); }
 
     //ray directions
     static uint64_t shiftSouth(uint64_t BB) { return (BB >> 8); }
@@ -170,9 +169,11 @@ public:
     static uint64_t southEastFill(uint64_t sliders, uint64_t empty);
     static uint64_t southWestFill(uint64_t sliders, uint64_t empty);
 
+    static Directions getPawnDirection(PieceColor color);
     static uint16_t getDirectionOffset(Directions dir);
     static Directions getOppositeDirection(int dir);
     static Directions getOppositeDirection(Directions dir);
+    static PieceColor getOppositeColor(PieceColor color) { return static_cast<Board::PieceColor>((color + 1)%2); }
     static bool isNegative(Directions dir);
 
     static uint16_t bitScan(uint64_t BB, bool reverse);
@@ -204,8 +205,8 @@ inline consteval std::array<Board::Directions, NUM_TOTAL_DIRECTIONS> genOpposite
     return oppositeDirections;
 }
 
-inline constinit const std::array<int16_t, NUM_TOTAL_DIRECTIONS> directionOffsetTable {genDirectionOffsetTable()}; 
-inline constinit const std::array<Board::Directions, NUM_TOTAL_DIRECTIONS> oppositeDirectionTable {genOppositeDirectionTable()}; 
+inline constinit const std::array<int16_t, NUM_TOTAL_DIRECTIONS> directionOffsetTable { genDirectionOffsetTable() }; 
+inline constinit const std::array<Board::Directions, NUM_TOTAL_DIRECTIONS> oppositeDirectionTable { genOppositeDirectionTable() }; 
 
 inline uint16_t Board::getDirectionOffset(Directions dir) { 
     assert(dir >= 0 && dir <= NUM_TOTAL_DIRECTIONS);
@@ -224,6 +225,12 @@ inline Board::Directions Board::getOppositeDirection(int dir) {
 
 inline bool Board::isNegative(Directions dir) {
     return directionOffsetTable[dir] < 0;
+}
+
+inline constinit const std::array<Board::Directions, 2> pawnDirTable { Board::north, Board::south };
+
+inline Board::Directions Board::getPawnDirection(PieceColor color) {
+    return pawnDirTable[color];
 }
 
 inline uint64_t Board::pawnShift(uint64_t BB, Directions dir) {

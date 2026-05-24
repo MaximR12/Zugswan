@@ -4,11 +4,6 @@
 #include "Board.h"
 #include <vector> 
 
-enum class Turn {  
-    WHITE,
-    BLACK
-};
-
 class MoveGen {
 private:
     Board* const m_board;
@@ -16,5 +11,5 @@ private:
 public:
     MoveGen(Board* board) : m_board{board} { }
 
-    std::vector<Move> getLegalMoves(Turn turn);
+    std::vector<Move> getLegalMoves(Board::PieceColor color);
 };
