@@ -155,7 +155,6 @@ auto initRayAttackTable()
     initFileAttacks(rayAttackTable);
     initDiagAttacks(rayAttackTable);
     initAntiDiagAttacks(rayAttackTable);
-
     return rayAttackTable;
 }
 
@@ -186,6 +185,10 @@ Board::Board() {
     m_emptyBB = ~m_occupiedBB;
     m_enPassantTargets[white] = EMPTY;
     m_enPassantTargets[black] = EMPTY;
+    m_kingCastleRights[white] = UNIVERSE;
+    m_kingCastleRights[black] = UNIVERSE;
+    m_queenCastleRights[white] = UNIVERSE;
+    m_queenCastleRights[black] = UNIVERSE;
 
     initPawnAttackTables(m_pawnAttackTable);
     initKnightMoveTable(m_knightMoveTable);
@@ -272,13 +275,11 @@ uint64_t Board::southWestFill(uint64_t sliders, uint64_t empty) {
 
 Board::PieceType Board::getPieceType(uint16_t ind) const {
     assert(ind >= 0 && ind < NUM_SQUARES); 
-
     PieceColor color = this->getPieceColor(ind);
     for(int curPieceSet = pawns; curPieceSet <= king; ++curPieceSet) { //loop over all piece types
         if(m_pieceBB[color][curPieceSet]&(1ULL<<ind))
             return static_cast<PieceType>(curPieceSet);
     }   
-
     return invalid;
 }
 

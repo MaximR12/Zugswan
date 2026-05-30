@@ -115,24 +115,39 @@ void appendKnightMoves(std::array<uint64_t, NUM_TOTAL_DIRECTIONS>& moveTargets, 
    moveTargets[Board::southWestWest] = Board::shiftSouthWestWest(knights) & checkMask;
 }
 
-void appendPawnMoves(std::array<uint64_t, NUM_TOTAL_DIRECTIONS>& moveTargets, uint64_t pawns, Board::Directions pawnDir, uint64_t oppPieces, uint64_t epAttackTargets,
-      uint64_t verInBetween, uint64_t diagInBetween, uint64_t antiInBetween, uint64_t allInBetween, uint64_t empty, uint64_t checkMask, Board::PieceColor color) 
+void appendPawnMoves(std::array<uint64_t, NUM_TOTAL_DIRECTIONS>& moveTargets, std::array<uint64_t, NUM_ORTHOGONAL_DIRECTIONS>& promoMoveTargets, uint64_t pawns, 
+      Board::Directions pawnDir, uint64_t oppPieces, uint64_t epAttackTargets, uint64_t verInBetween, uint64_t diagInBetween, uint64_t antiInBetween, uint64_t allInBetween,
+      uint64_t empty, uint64_t checkMask, Board::PieceColor color) 
 {
-   uint64_t pinSafe = pawns & ~(allInBetween ^ antiInBetween);
+   //push moves
+   uint64_t pinSafe = pawns & ~(allInBetween ^ verInBetween);
    uint64_t singlePushTargets = Board::pawnShift(pinSafe, pawnDir) & empty;
-   moveTargets[pawnDir] |= singlePushTargets & checkMask;
+   moveTargets[pawnDir] |= singlePushTargets & checkMask & NOT_LAST_RANK;
+   promoMoveTargets[pawnDir] = singlePushTargets & checkMask & LAST_RANK;
+   promoMoveTargets[Board::getOppositeDirection(pawnDir)] = 0;
 
    uint64_t doublePushTargets = Board::pawnShift(pinSafe & PAWN_RANK, pawnDir) & empty;
    moveTargets[pawnDir] |= Board::pawnShift(doublePushTargets, pawnDir) & empty & checkMask;
 
+   //attacks
    uint64_t pawnAttackTargets = Board::pawnAttackTargetsSafe(pawns, color, diagInBetween, antiInBetween, allInBetween) & (oppPieces | epAttackTargets);
-   moveTargets[Board::northEast] |= pawnAttackTargets & Board::shiftNorthEast(pawns) & checkMask;
-   moveTargets[Board::northWest] |= pawnAttackTargets & Board::shiftNorthWest(pawns) & checkMask;
-   moveTargets[Board::southEast] |= pawnAttackTargets & Board::shiftSouthEast(pawns) & checkMask;
-   moveTargets[Board::southWest] |= pawnAttackTargets & Board::shiftSouthWest(pawns) & checkMask;
+
+   uint64_t northEastTargets = pawnAttackTargets & Board::shiftNorthEast(pawns) & checkMask;
+   moveTargets[Board::northEast] |= northEastTargets & NOT_LAST_RANK;
+   uint64_t southEastTargets = pawnAttackTargets & Board::shiftSouthEast(pawns) & checkMask;
+   moveTargets[Board::southEast] |= southEastTargets & NOT_LAST_RANK;
+   promoMoveTargets[Board::east] = (northEastTargets | southEastTargets) & LAST_RANK; 
+
+   uint64_t northWestTargets = pawnAttackTargets & Board::shiftNorthWest(pawns) & checkMask;
+   moveTargets[Board::northWest] |= northWestTargets & NOT_LAST_RANK;
+   uint64_t southWestTargets = pawnAttackTargets & Board::shiftSouthWest(pawns) & checkMask;
+   moveTargets[Board::southWest] |= southWestTargets & NOT_LAST_RANK;
+   promoMoveTargets[Board::west] = (northWestTargets | southWestTargets) & LAST_RANK;
 }
 
-void appendKingMoves(std::array<uint64_t, NUM_TOTAL_DIRECTIONS>& moveTargets, uint64_t pieces, uint64_t king, uint64_t oppAnyAttacks) {
+void appendKingMoves(std::array<uint64_t, NUM_TOTAL_DIRECTIONS>& moveTargets, uint64_t pieces, uint64_t king, uint64_t oppAnyAttacks,
+      uint64_t nullIfCheck, uint64_t kingCastleRights, uint64_t queenCastleRights) 
+{
    uint64_t targetMask = ~(pieces | oppAnyAttacks);
    moveTargets[Board::north] |= Board::shiftNorth(king) & targetMask;
    moveTargets[Board::south] |= Board::shiftSouth(king) & targetMask;
@@ -142,6 +157,12 @@ void appendKingMoves(std::array<uint64_t, NUM_TOTAL_DIRECTIONS>& moveTargets, ui
    moveTargets[Board::northWest] |= Board::shiftNorthWest(king) & targetMask;
    moveTargets[Board::southEast] |= Board::shiftSouthEast(king) & targetMask;
    moveTargets[Board::southWest] |= Board::shiftSouthWest(king) & targetMask;
+
+   //castle moves
+   uint64_t eastOne = Board::shiftEast(king) & targetMask;
+   moveTargets[Board::east] |= Board::shiftEast(eastOne) & targetMask & kingCastleRights & nullIfCheck;
+   uint64_t westOne = Board::shiftWest(king) & targetMask;
+   moveTargets[Board::west] |= Board::shiftWest(westOne) & targetMask & kingCastleRights & nullIfCheck;
 }
 
 void serializeKnightMoves(std::vector<Move>& moves, std::array<std::array<uint16_t, NUM_SQUARES>, NUM_TOTAL_DIRECTIONS> targetInds, 
@@ -162,11 +183,11 @@ void serializeKnightMoves(std::vector<Move>& moves, std::array<std::array<uint16
    } 
 }
 
-uint16_t getFlag(uint16_t from, uint16_t to, uint64_t pawns, uint64_t oppPieces, uint64_t epTargets) {
+uint16_t getFlag(uint16_t from, uint16_t to, uint64_t pawns, uint64_t king, uint64_t oppPieces, uint64_t epTargets) {
    uint64_t toBB = 1ULL << to, fromBB = 1ULL << from;
    uint16_t flag = QUIET_MOVE;
 
-   int64_t nullIfCapture = ((int64_t)((1ULL << to) & oppPieces) - 1) >> 63;
+   int64_t nullIfCapture = Board::nullBoolMask(toBB & oppPieces);
    flag |= CAPTURE & ~nullIfCapture;
 
    uint64_t fromIfPawn = fromBB & pawns;
@@ -175,40 +196,66 @@ uint16_t getFlag(uint16_t from, uint16_t to, uint64_t pawns, uint64_t oppPieces,
    uint64_t nonZeroIfDoublePush = ((toBB << 16) & fromBB) | ((toBB >> 16) & fromBB);
    flag |= DOUBLE_PAWN_PUSH & Board::fullBoolMask(nonZeroIfDoublePush) & pawnMask;
    flag |= EP_CAPTURE & Board::fullBoolMask(toBB & epTargets) & pawnMask;
+   // flag |= QUEEN_PROMOTION & Board::nullBoolMask(toBB & NOT_LAST_RANK) & pawnMask;
+
+   uint64_t nonZeroIfKingCastle = (toBB >> 2) & king & fromBB;
+   uint64_t nonZeroIfQueenCastle = (toBB << 2) & king & fromBB;
+   flag |= KING_CASTLE & Board::fullBoolMask(nonZeroIfKingCastle);
+   flag |= QUEEN_CASTLE & Board::fullBoolMask(nonZeroIfQueenCastle);
 
    return flag;
 }
 
-void serializeSliderMoves(std::vector<Move>& moves, std::array<std::array<uint16_t, NUM_SQUARES>, NUM_TOTAL_DIRECTIONS> targetInds, 
-      std::array<uint16_t, NUM_TOTAL_DIRECTIONS> targetIndLengths, uint64_t pawns, uint64_t oppPieces, uint64_t epTargets, uint64_t occupied) 
+void serializeSliderMoves(std::vector<Move>& moves, std::array<std::array<uint16_t, NUM_SQUARES>, NUM_TOTAL_DIRECTIONS>& targetInds, 
+      std::array<uint16_t, NUM_TOTAL_DIRECTIONS>& targetIndLengths, std::array<std::array<uint16_t, NUM_SQUARES>, NUM_TOTAL_DIRECTIONS>& promoInds, 
+      std::array<uint16_t, NUM_ORTHOGONAL_DIRECTIONS>& promoIndLengths, uint64_t pawns, Board::Directions pawnDir, uint64_t king, uint64_t oppPieces,
+      uint64_t epTargets, uint64_t occupied) 
 {
    for(int dir = 0; dir < NUM_SLIDER_DIRECTIONS; ++dir) { 
       uint16_t len = targetIndLengths[dir];
       for(int i = 0; i < len; ++i) {
          uint16_t to = targetInds[dir][i];
          uint16_t from = Board::serializeSingleBit(getRayAttacks(to, occupied, Board::getOppositeDirection(dir)) & occupied);
-         uint16_t flag = getFlag(from, to, pawns, oppPieces, epTargets);
+         uint16_t flag = getFlag(from, to, pawns, king, oppPieces, epTargets);
 
          moves.emplace_back(flag, from, to);
       }
-   } 
+   }
+
+   for(int dir = 0; dir < NUM_ORTHOGONAL_DIRECTIONS; ++dir) { 
+      uint16_t len = promoIndLengths[dir];
+      for(int i = 0; i < len; ++i) {
+         uint16_t to = promoInds[dir][i];
+         uint16_t from = to - (Board::getDirectionOffset(pawnDir) + Board::getDirectionOffset(dir) % 8);
+
+         int64_t nullIfCapture = Board::nullBoolMask((1ULL << to) & oppPieces);
+         uint16_t captureMask = CAPTURE & ~nullIfCapture;
+         for(uint16_t flag = KNIGHT_PROMOTION; flag <= QUEEN_PROMOTION; ++flag) //append each possible piece promo
+            moves.emplace_back(flag | captureMask, from, to);
+      }
+   }
 }
 
-void serializeMoves(std::vector<Move>& moves, std::array<uint64_t, NUM_TOTAL_DIRECTIONS>& moveTargets, 
-      uint64_t pawns, uint64_t oppPieces, uint64_t epTargets, uint64_t occupied) 
+void serializeMoves(std::vector<Move>& moves, std::array<uint64_t, NUM_TOTAL_DIRECTIONS>& moveTargets, std::array<uint64_t, NUM_ORTHOGONAL_DIRECTIONS>& promoMoveTargets,
+      uint64_t pawns, Board::Directions pawnDir, uint64_t king, uint64_t oppPieces, uint64_t epTargets, uint64_t occupied) 
 {
    std::array<uint16_t, NUM_TOTAL_DIRECTIONS> targetIndLengths; 
    std::array<std::array<uint16_t, NUM_SQUARES>, NUM_TOTAL_DIRECTIONS> targetInds;
    for(int dir = 0; dir < NUM_TOTAL_DIRECTIONS; ++dir) 
       targetIndLengths[dir] = Board::serializeBitboard(moveTargets[dir], targetInds[dir]);
-
    serializeKnightMoves(moves, targetInds, targetIndLengths, oppPieces);
-   serializeSliderMoves(moves, targetInds, targetIndLengths, pawns, oppPieces, epTargets, occupied);
+
+   std::array<uint16_t, NUM_ORTHOGONAL_DIRECTIONS> promoIndLengths; 
+   std::array<std::array<uint16_t, NUM_SQUARES>, NUM_TOTAL_DIRECTIONS> promoInds;
+   for(int dir = 0; dir < NUM_ORTHOGONAL_DIRECTIONS; ++dir) 
+      promoIndLengths[dir] = Board::serializeBitboard(promoMoveTargets[dir], promoInds[dir]);
+   serializeSliderMoves(moves, targetInds, targetIndLengths, promoInds, promoIndLengths, pawns, pawnDir, king, oppPieces, epTargets, occupied);
 }
 
-//Dirgolem move generation, generate 16 move target bitboards for each direction, then serialize into moves
+//Dirgolem move generation, generate 16 move target bitboards for each direction, then serialize into move objects
 std::vector<Move> MoveGen::getLegalMoves(Board::PieceColor color) {
    std::array<uint64_t, NUM_TOTAL_DIRECTIONS> moveTargets;
+   std::array<uint64_t, NUM_ORTHOGONAL_DIRECTIONS> promoMoveTargets; //pawn promotion moves
 
    Board::PieceColor oppColor = Board::getOppositeColor(color);
    Board::Directions pawnDir = Board::getPawnDirection(color);
@@ -283,17 +330,17 @@ std::vector<Move> MoveGen::getLegalMoves(Board::PieceColor color) {
    uint64_t checkTo = checkFrom | blocks | nullIfCheck;
    uint64_t checkMask = ~pieces & checkTo & nullIfDoubleCheck;
 
-   appendHorSliderMoves(moveTargets, horInBetween, allInBetween, rookLike, empty, checkMask);
-   appendVerSliderMoves(moveTargets, verInBetween, allInBetween, rookLike, empty, checkMask);
-   appendDiagSliderMoves(moveTargets, diagInBetween, allInBetween, bishopLike, empty, checkMask);
-   appendAntiSliderMoves(moveTargets, antiInBetween, allInBetween, bishopLike, empty, checkMask);
+   appendHorSliderMoves(moveTargets, horInBetween, allInBetween, rookLike, empty, checkMask); //queen + rook
+   appendVerSliderMoves(moveTargets, verInBetween, allInBetween, rookLike, empty, checkMask); //queen + rook
+   appendDiagSliderMoves(moveTargets, diagInBetween, allInBetween, bishopLike, empty, checkMask); //queen + bishop
+   appendAntiSliderMoves(moveTargets, antiInBetween, allInBetween, bishopLike, empty, checkMask); //queen + bishop
    appendKnightMoves(moveTargets, knights, allInBetween, checkMask);
-   appendPawnMoves(moveTargets, pawns, pawnDir, oppPieces, epAttackTargets, verInBetween, diagInBetween, antiInBetween, allInBetween, empty, checkMask, color);
-   appendKingMoves(moveTargets, pieces, king, oppAnyAttacks);
+   appendPawnMoves(moveTargets, promoMoveTargets, pawns, pawnDir, oppPieces, epAttackTargets, verInBetween, diagInBetween, antiInBetween, allInBetween, empty, checkMask, color);
+   appendKingMoves(moveTargets, pieces, king, oppAnyAttacks, nullIfCheck, m_board->getKingCastleRights(color), m_board->getQueenCastleRights(color));
 
    std::vector<Move> moves;
    moves.reserve(MAX_LEGAL_MOVES);
-   serializeMoves(moves, moveTargets, pawns, oppPieces, epAttackTargets, m_board->getOccupied());
+   serializeMoves(moves, moveTargets, promoMoveTargets, pawns, pawnDir, king, oppPieces, epAttackTargets, m_board->getOccupied());
 
    return moves;
 }

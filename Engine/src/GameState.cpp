@@ -1,6 +1,16 @@
 #include "GameState.h"
 #include <unordered_map>
 
+void updateCastleRights(Board* board, Board::PieceColor fromColor, uint64_t fromBB) {
+    uint64_t king = board->getPieceSet(Board::king, fromColor);
+    uint64_t nullIfKingRookMove = Board::nullBoolMask(fromBB & king << 3);
+    uint64_t nullIfQueenRookMove = Board::nullBoolMask(fromBB & king >> 4);
+    uint64_t nullIfKingMove = Board::nullBoolMask(fromBB & king);
+
+    board->updateKingCastleRights(fromColor, board->getKingCastleRights(fromColor) & nullIfKingRookMove & nullIfKingMove);
+    board->updateQueenCastleRights(fromColor, board->getQueenCastleRights(fromColor) & nullIfQueenRookMove & nullIfKingMove);
+}
+
 void GameState::makeMove(Move move) {
     uint16_t fromInd = move.getFrom(), toInd = move.getTo();
     uint64_t fromBB = 1ULL << fromInd;
@@ -13,6 +23,7 @@ void GameState::makeMove(Move move) {
     uint64_t fromColorBB = m_board.getPieceSet(Board::all, fromColor);
     uint64_t fromTypeBB = m_board.getPieceSet(fromType, fromColor);
 
+    updateCastleRights(&m_board, fromColor, fromBB);
     uint16_t flag = move.getFlag();
     m_board.updateEnPassantTargets(oppColor, 0ULL);
     if(!move.isCapture() || flag == EP_CAPTURE) {
@@ -68,11 +79,27 @@ void GameState::makeMove(Move move) {
 
         case KING_CASTLE:
         {
+            uint64_t rooks = m_board.getPieceSet(Board::rooks, fromColor);
+            uint64_t kingRook = fromBB << 3;
+            uint64_t rookFromToBB = kingRook | (kingRook >> 2);
+
+            m_board.updateBB(Board::all, fromColor, m_board.getPieceSet(Board::all, fromColor) ^ rookFromToBB);
+            m_board.updateBB(Board::rooks, fromColor, rooks ^ rookFromToBB);
+            m_board.updateOccupiedBB(m_board.getOccupied() ^ rookFromToBB);
+            m_board.updateEmptyBB(~m_board.getOccupied());
             break;
         }
 
         case QUEEN_CASTLE:
         {
+            uint64_t rooks = m_board.getPieceSet(Board::rooks, fromColor);
+            uint64_t queenRook = fromBB >> 4;
+            uint64_t rookFromToBB = queenRook | (queenRook << 3);
+
+            m_board.updateBB(Board::all, fromColor, m_board.getPieceSet(Board::all, fromColor) ^ rookFromToBB);
+            m_board.updateBB(Board::rooks, fromColor, rooks ^ rookFromToBB);
+            m_board.updateOccupiedBB(m_board.getOccupied() ^ rookFromToBB);
+            m_board.updateEmptyBB(~m_board.getOccupied());      
             break;
         }
 
@@ -87,7 +114,7 @@ void GameState::makeMove(Move move) {
 
         case KNIGHT_PROMOTION:
         {
-            m_board.updateBB(Board::pawns, fromColor, NOT_LAST_RANK);
+            m_board.updateBB(Board::pawns, fromColor, m_board.getPieceSet(Board::pawns, fromColor) & NOT_LAST_RANK);
             uint64_t knightSet = m_board.getPieceSet(Board::knights, fromColor);
             m_board.updateBB(Board::knights, fromColor, knightSet | toBB);
             break;
@@ -95,7 +122,7 @@ void GameState::makeMove(Move move) {
             
         case BISHOP_PROMOTION:
         {
-            m_board.updateBB(Board::pawns, fromColor, NOT_LAST_RANK);
+            m_board.updateBB(Board::pawns, fromColor, m_board.getPieceSet(Board::pawns, fromColor) & NOT_LAST_RANK);
             uint64_t bishopSet = m_board.getPieceSet(Board::bishops, fromColor);
             m_board.updateBB(Board::bishops, fromColor, bishopSet | toBB);
             break;
@@ -103,7 +130,7 @@ void GameState::makeMove(Move move) {
             
         case ROOK_PROMOTION:
         {
-            m_board.updateBB(Board::pawns, fromColor, NOT_LAST_RANK);
+            m_board.updateBB(Board::pawns, fromColor, m_board.getPieceSet(Board::pawns, fromColor) & NOT_LAST_RANK);
             uint64_t rookSet = m_board.getPieceSet(Board::rooks, fromColor);
             m_board.updateBB(Board::rooks, fromColor, rookSet | toBB);
             break;
@@ -111,7 +138,7 @@ void GameState::makeMove(Move move) {
             
         case QUEEN_PROMOTION:
         {
-            m_board.updateBB(Board::pawns, fromColor, NOT_LAST_RANK);
+            m_board.updateBB(Board::pawns, fromColor, m_board.getPieceSet(Board::pawns, fromColor) & NOT_LAST_RANK);
             uint64_t queenSet = m_board.getPieceSet(Board::queens, fromColor);
             m_board.updateBB(Board::queens, fromColor, queenSet | toBB);
             break;

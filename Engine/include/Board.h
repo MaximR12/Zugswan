@@ -40,6 +40,7 @@ constexpr uint64_t NOT_AB_FILE = 0xFCFCFCFCFCFCFCFCULL;
 constexpr uint64_t NOT_H_FILE = 0x7F7F7F7F7F7F7F7FULL;
 constexpr uint64_t NOT_GH_FILE = 0x3F3F3F3F3F3F3F3FULL;
 constexpr uint64_t NOT_LAST_RANK = 0x00FFFFFFFFFFFF00ULL;
+constexpr uint64_t LAST_RANK = 0xFF000000000000FFULL;
 
 constexpr uint64_t WHITE_KNIGHTS = 0x0000000000000042ULL; 
 constexpr uint64_t BLACK_KNIGHTS = 0x4200000000000000ULL;
@@ -76,12 +77,15 @@ constexpr int NUM_SQUARES = 64;
 constexpr int NUM_TOTAL_DIRECTIONS = 16; //slider + knight directions
 constexpr int NUM_SLIDER_DIRECTIONS = 8;
 constexpr int NUM_KNIGHT_DIRECTIONS = 8;
+constexpr int NUM_ORTHOGONAL_DIRECTIONS = 4;
 constexpr int ROW_LEN = 8;
 
 class Board {
 private:
     std::array<std::array<uint64_t, NUM_PIECE_TYPES>, 2> m_pieceBB;
     std::array<uint64_t, 2> m_enPassantTargets;
+    std::array<uint64_t, 2> m_kingCastleRights;
+    std::array<uint64_t, 2> m_queenCastleRights;
     uint64_t m_emptyBB;
     uint64_t m_occupiedBB;
 
@@ -110,6 +114,8 @@ public:
 
     uint64_t getPieceSet(PieceType type, PieceColor color) const { return m_pieceBB[color][type]; }
     uint64_t getEnPassantTargets(PieceColor color) const { return m_enPassantTargets[color]; }
+    uint64_t getKingCastleRights(PieceColor color) const { return m_kingCastleRights[color]; }
+    uint64_t getQueenCastleRights(PieceColor color) const { return m_queenCastleRights[color]; }
     uint64_t getOccupied() const { return m_occupiedBB; }
     uint64_t getEmpty() const { return m_emptyBB; }
 
@@ -122,6 +128,8 @@ public:
 
     void updateBB(PieceType type, PieceColor color, uint64_t BB) { m_pieceBB[color][type] = BB; }
     void updateEnPassantTargets(PieceColor color, uint64_t BB) { m_enPassantTargets[color] = BB; }
+    void updateKingCastleRights(PieceColor color, uint64_t BB) { m_kingCastleRights[color] = BB; }
+    void updateQueenCastleRights(PieceColor color, uint64_t BB) { m_queenCastleRights[color] = BB; }
     void updateOccupiedBB(uint64_t BB) { m_occupiedBB = BB; }
     void updateEmptyBB(uint64_t BB) { m_emptyBB = BB; }
 
@@ -171,6 +179,7 @@ public:
 
     static Directions getPawnDirection(PieceColor color);
     static uint16_t getDirectionOffset(Directions dir);
+    static uint16_t getDirectionOffset(int dir);
     static Directions getOppositeDirection(int dir);
     static Directions getOppositeDirection(Directions dir);
     static PieceColor getOppositeColor(PieceColor color) { return static_cast<Board::PieceColor>((color + 1)%2); }
@@ -209,6 +218,11 @@ inline constinit const std::array<int16_t, NUM_TOTAL_DIRECTIONS> directionOffset
 inline constinit const std::array<Board::Directions, NUM_TOTAL_DIRECTIONS> oppositeDirectionTable { genOppositeDirectionTable() }; 
 
 inline uint16_t Board::getDirectionOffset(Directions dir) { 
+    assert(dir >= 0 && dir <= NUM_TOTAL_DIRECTIONS);
+    return directionOffsetTable[dir];
+}
+
+inline uint16_t Board::getDirectionOffset(int dir) { 
     assert(dir >= 0 && dir <= NUM_TOTAL_DIRECTIONS);
     return directionOffsetTable[dir];
 }
