@@ -89,11 +89,6 @@ private:
     uint64_t m_emptyBB;
     uint64_t m_occupiedBB;
 
-    std::array<std::array<uint64_t, NUM_SQUARES>, 2> m_pawnAttackTable;
-    std::array<uint64_t, NUM_SQUARES> m_kingMoveTable;
-    std::array<uint64_t, NUM_SQUARES> m_knightMoveTable;
-    std::array<std::array<uint64_t, NUM_SQUARES>, NUM_SLIDER_DIRECTIONS> m_rayAttackTable; 
-
 public:
     enum PieceColor {
         white, black
@@ -118,10 +113,6 @@ public:
     uint64_t getQueenCastleRights(PieceColor color) const { return m_queenCastleRights[color]; }
     uint64_t getOccupied() const { return m_occupiedBB; }
     uint64_t getEmpty() const { return m_emptyBB; }
-
-    uint64_t getPawnSquareAttacks(uint16_t ind, PieceColor color) const { assert(ind >= 0 && ind < NUM_SQUARES && color < 2); return m_pawnAttackTable[color][ind]; }
-    uint64_t getKingMoves(uint16_t ind) const { assert(ind >= 0 && ind < NUM_SQUARES); return m_kingMoveTable[ind]; }
-    uint64_t getKnightMoves(uint16_t ind) const { assert(ind >= 0 && ind < NUM_SQUARES); return m_knightMoveTable[ind]; }
 
     PieceColor getPieceColor(uint16_t ind) const { assert(ind >= 0 && ind < NUM_SQUARES); return m_pieceBB[white][all]&(1ULL<<ind) ? white : black; }
     PieceType getPieceType(uint16_t ind) const;

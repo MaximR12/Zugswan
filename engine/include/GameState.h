@@ -9,43 +9,45 @@
 #include "Piece.h"
 
 constexpr int UNDEFINED_SQUARE = 65;
+constexpr int INIT_STACK_SIZE = 256;
 
 class GameState {
 private:
     const Board::PieceColor m_playerTurn;
     Board::PieceColor m_turn;
-    Board m_board;
+    std::vector<Board> m_boardStack;
+    Board* m_board;
+
+    Tables m_tables;
     MoveGen m_moveGen;
     Engine m_engine;
 
-    std::vector<Move> m_currLegalMoves;
+    uint16_t m_numLegalMoves;
+    std::array<Move, MAX_LEGAL_MOVES> m_currLegalMoves;
     std::vector<Move> m_moveList;
 
     uint16_t m_selectedSquare;
     uint64_t m_highlightedSquares;
     
 public:
-    GameState() : m_board{}, m_playerTurn{Board::white}, m_turn{Board::white}, m_moveGen{&m_board}, m_engine{&m_board, &m_moveGen}, m_currLegalMoves{}, m_selectedSquare{UNDEFINED_SQUARE} { 
-        m_currLegalMoves.reserve(MAX_LEGAL_MOVES); 
-        m_currLegalMoves = m_moveGen.getLegalMoves(m_playerTurn); 
-    }
+    GameState();
 
     void makeMove(Move move);
-    void unMakeMove(Move move);
+    void unMakeMove();
+    void playEngineMove();
 
     void switchTurn() { m_turn = Board::getOppositeColor(m_turn); }
     const Board::PieceColor getTurn() { return m_turn; }
     const Board::PieceColor playerTurn() { return m_playerTurn; }
 
-    void playEngineMove();
-
+    
     void handleClick(int square);
-
     uint16_t getSelected() const { return m_selectedSquare; } 
     void setHighlighted(uint16_t sq) { m_highlightedSquares |= (1ULL << sq); }
 
-    void updateLegalMoves() { m_currLegalMoves = m_moveGen.getLegalMoves(m_playerTurn); }
-    const std::vector<Move>& getLegalMoves() const { return m_currLegalMoves; }
+    void updateBoard() { m_board = &m_boardStack.back(); m_moveGen.updateBoard(m_board); m_engine.updateBoard(m_board); }
+    void updateLegalMoves() { m_numLegalMoves = m_moveGen.getLegalMoves(m_playerTurn, m_currLegalMoves); }
+    uint16_t getLegalMoves(std::array<Move, MAX_LEGAL_MOVES>& moveBuf) const { return m_moveGen.getLegalMoves(m_turn, moveBuf); };
     std::vector<Piece> getPieceList() const;
 
     static uint16_t getRow(uint16_t sq) { return ROW_LEN - sq / ROW_LEN; }

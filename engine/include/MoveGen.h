@@ -2,14 +2,17 @@
 
 #include "Move.h"
 #include "Board.h"
+#include "Tables.h"
 #include <vector> 
 
 class MoveGen {
 private:
-    Board* const m_board;
+    Board* m_board;
+    Tables* const m_tables;
 
 public:
-    MoveGen(Board* board) : m_board{board} { }
+    MoveGen(Board* board, Tables* tables) : m_board{board}, m_tables{tables} { }
 
-    std::vector<Move> getLegalMoves(Board::PieceColor color);
+    uint16_t getLegalMoves(Board::PieceColor color, std::array<Move, MAX_LEGAL_MOVES>& moveBuf) const;
+    void updateBoard(Board* board) { m_board = board; }
 };

@@ -44,27 +44,11 @@ uint64_t Board::pawnAttackTargets(uint64_t pawns, PieceColor color) {
     return func(pawns);
 }
 
-void initPawnAttackTables(std::array<std::array<uint64_t, NUM_SQUARES>, 2>& pawnAttackTable) {
-    uint64_t currBB = 1;
-    for(int i = 0; i < NUM_SQUARES; ++i, currBB <<= 1) 
-        pawnAttackTable[Board::white][i] = Board::whitePawnTargets(currBB);
-
-    currBB = 1;
-    for(int i = 0; i < NUM_SQUARES; ++i, currBB <<= 1) 
-        pawnAttackTable[Board::black][i] = Board::blackPawnTargets(currBB);        
-}   
-
 uint64_t Board::kingAttackTargets(uint64_t squareSet) {
     uint64_t attacks = Board::shiftEast(squareSet) | Board::shiftWest(squareSet);
     squareSet |= attacks;
     attacks |= (Board::shiftNorth(squareSet) | Board::shiftSouth(squareSet));
     return attacks;
-}
-
-void initKingMoveTable(std::array<uint64_t, NUM_SQUARES>& kingAttackTable) {
-    uint64_t currBB = 1;
-    for(int i = 0; i < NUM_SQUARES; ++i, currBB <<= 1) 
-        kingAttackTable[i] = Board::kingAttackTargets(currBB);
 }
 
 uint64_t Board::knightAttackTargets(uint64_t squareSet) {
@@ -82,12 +66,6 @@ uint64_t Board::knightAttackTargets(uint64_t squareSet) {
     attacks |= Board::shiftNorth(eastTwo|westTwo);
     attacks |= Board::shiftSouth(eastTwo|westTwo);
     return attacks;
-}
-
-void initKnightMoveTable(std::array<uint64_t, NUM_SQUARES>& knightMoveTable) {
-    uint64_t currBB = 1;
-    for(int sq = 0; sq < NUM_SQUARES; ++sq, currBB <<= 1) 
-        knightMoveTable[sq] = Board::knightAttackTargets(currBB);
 }
 
 void initRankAttacks(std::array<std::array<uint64_t, NUM_SQUARES>, NUM_SLIDER_DIRECTIONS>& rayAttackTable) {
@@ -189,10 +167,6 @@ Board::Board() {
     m_kingCastleRights[black] = UNIVERSE;
     m_queenCastleRights[white] = UNIVERSE;
     m_queenCastleRights[black] = UNIVERSE;
-
-    initPawnAttackTables(m_pawnAttackTable);
-    initKnightMoveTable(m_knightMoveTable);
-    initKingMoveTable(m_kingMoveTable);
 }
 
 uint64_t Board::northFill(uint64_t sliders, uint64_t empty) {
@@ -305,5 +279,4 @@ void Board::printBitBoard(uint64_t BB) {
         std::cout << bb[i]; 
         if(i % 8 == 0) std::cout << '\n';
     }
-    std::cout << '\n';
 }
