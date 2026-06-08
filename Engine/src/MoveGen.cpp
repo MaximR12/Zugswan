@@ -146,7 +146,7 @@ void appendPawnMoves(std::array<uint64_t, NUM_TOTAL_DIRECTIONS>& moveTargets, st
 }
 
 void appendKingMoves(std::array<uint64_t, NUM_TOTAL_DIRECTIONS>& moveTargets, uint64_t pieces, uint64_t king, uint64_t oppAnyAttacks,
-      uint64_t nullIfCheck, uint64_t kingCastleRights, uint64_t queenCastleRights) 
+      uint64_t nullIfCheck, uint64_t kingCastleRights, uint64_t queenCastleRights, uint64_t occupied) 
 {
    uint64_t targetMask = ~(pieces | oppAnyAttacks);
    moveTargets[Board::north] |= Board::shiftNorth(king) & targetMask;
@@ -162,12 +162,14 @@ void appendKingMoves(std::array<uint64_t, NUM_TOTAL_DIRECTIONS>& moveTargets, ui
    uint64_t eastOne = Board::shiftEast(king) & targetMask;
    moveTargets[Board::east] |= Board::shiftEast(eastOne) & targetMask & kingCastleRights & nullIfCheck;
    uint64_t westOne = Board::shiftWest(king) & targetMask;
-   moveTargets[Board::west] |= Board::shiftWest(westOne) & targetMask & kingCastleRights & nullIfCheck;
+   uint64_t westTwo = Board::shiftWest(westOne) & targetMask;
+   moveTargets[Board::west] |= westTwo & Board::nullBoolMask(Board::shiftWest(westTwo) & occupied) & queenCastleRights & nullIfCheck; //queen castle includes occupency check of square east of queen rook
 }
 
-void serializeKnightMoves(std::vector<Move>& moves, std::array<std::array<uint16_t, NUM_SQUARES>, NUM_TOTAL_DIRECTIONS> targetInds, 
+uint16_t serializeKnightMoves(std::array<Move, MAX_LEGAL_MOVES>& moveBuf, std::array<std::array<uint16_t, NUM_SQUARES>, NUM_TOTAL_DIRECTIONS> targetInds, 
       std::array<uint16_t, NUM_TOTAL_DIRECTIONS> targetIndLengths, uint64_t oppPieces) 
 {
+   uint16_t currInd = 0;
    for(int dir = Board::northNorthEast; dir < NUM_TOTAL_DIRECTIONS; ++dir) { 
       uint16_t len = targetIndLengths[dir];
       for(int i = 0; i < len; ++i) {
@@ -178,9 +180,11 @@ void serializeKnightMoves(std::vector<Move>& moves, std::array<std::array<uint16
          int16_t nullIfCapture = ((int64_t)((1ULL << to) & oppPieces) - 1) >> 63;
          uint16_t flag = CAPTURE & ~nullIfCapture;
 
-         moves.emplace_back(flag, from, to);
+         moveBuf[currInd++] = Move(flag, from, to);
       }
    } 
+
+   return currInd;
 }
 
 uint16_t getFlag(uint16_t from, uint16_t to, uint64_t pawns, uint64_t king, uint64_t oppPieces, uint64_t epTargets) {
@@ -206,7 +210,7 @@ uint16_t getFlag(uint16_t from, uint16_t to, uint64_t pawns, uint64_t king, uint
    return flag;
 }
 
-void serializeSliderMoves(std::vector<Move>& moves, std::array<std::array<uint16_t, NUM_SQUARES>, NUM_TOTAL_DIRECTIONS>& targetInds, 
+uint16_t serializeSliderMoves(std::array<Move, MAX_LEGAL_MOVES>& moveBuf, uint16_t currInd, std::array<std::array<uint16_t, NUM_SQUARES>, NUM_TOTAL_DIRECTIONS>& targetInds, 
       std::array<uint16_t, NUM_TOTAL_DIRECTIONS>& targetIndLengths, std::array<std::array<uint16_t, NUM_SQUARES>, NUM_TOTAL_DIRECTIONS>& promoInds, 
       std::array<uint16_t, NUM_ORTHOGONAL_DIRECTIONS>& promoIndLengths, uint64_t pawns, Board::Directions pawnDir, uint64_t king, uint64_t oppPieces,
       uint64_t epTargets, uint64_t occupied) 
@@ -218,7 +222,7 @@ void serializeSliderMoves(std::vector<Move>& moves, std::array<std::array<uint16
          uint16_t from = Board::serializeSingleBit(getRayAttacks(to, occupied, Board::getOppositeDirection(dir)) & occupied);
          uint16_t flag = getFlag(from, to, pawns, king, oppPieces, epTargets);
 
-         moves.emplace_back(flag, from, to);
+         moveBuf[currInd++] = Move(flag, from, to);
       }
    }
 
@@ -231,29 +235,31 @@ void serializeSliderMoves(std::vector<Move>& moves, std::array<std::array<uint16
          int64_t nullIfCapture = Board::nullBoolMask((1ULL << to) & oppPieces);
          uint16_t captureMask = CAPTURE & ~nullIfCapture;
          for(uint16_t flag = KNIGHT_PROMOTION; flag <= QUEEN_PROMOTION; ++flag) //append each possible piece promo
-            moves.emplace_back(flag | captureMask, from, to);
+            moveBuf[currInd++] = Move(flag | captureMask, from, to);
       }
    }
+
+   return currInd;
 }
 
-void serializeMoves(std::vector<Move>& moves, std::array<uint64_t, NUM_TOTAL_DIRECTIONS>& moveTargets, std::array<uint64_t, NUM_ORTHOGONAL_DIRECTIONS>& promoMoveTargets,
+uint16_t serializeMoves(std::array<Move, MAX_LEGAL_MOVES>& moveBuf, std::array<uint64_t, NUM_TOTAL_DIRECTIONS>& moveTargets, std::array<uint64_t, NUM_ORTHOGONAL_DIRECTIONS>& promoMoveTargets,
       uint64_t pawns, Board::Directions pawnDir, uint64_t king, uint64_t oppPieces, uint64_t epTargets, uint64_t occupied) 
 {
    std::array<uint16_t, NUM_TOTAL_DIRECTIONS> targetIndLengths; 
    std::array<std::array<uint16_t, NUM_SQUARES>, NUM_TOTAL_DIRECTIONS> targetInds;
    for(int dir = 0; dir < NUM_TOTAL_DIRECTIONS; ++dir) 
       targetIndLengths[dir] = Board::serializeBitboard(moveTargets[dir], targetInds[dir]);
-   serializeKnightMoves(moves, targetInds, targetIndLengths, oppPieces);
+   uint16_t currInd = serializeKnightMoves(moveBuf, targetInds, targetIndLengths, oppPieces);
 
    std::array<uint16_t, NUM_ORTHOGONAL_DIRECTIONS> promoIndLengths; 
    std::array<std::array<uint16_t, NUM_SQUARES>, NUM_TOTAL_DIRECTIONS> promoInds;
    for(int dir = 0; dir < NUM_ORTHOGONAL_DIRECTIONS; ++dir) 
       promoIndLengths[dir] = Board::serializeBitboard(promoMoveTargets[dir], promoInds[dir]);
-   serializeSliderMoves(moves, targetInds, targetIndLengths, promoInds, promoIndLengths, pawns, pawnDir, king, oppPieces, epTargets, occupied);
+   return serializeSliderMoves(moveBuf, currInd, targetInds, targetIndLengths, promoInds, promoIndLengths, pawns, pawnDir, king, oppPieces, epTargets, occupied);
 }
 
 //Dirgolem move generation, generate 16 move target bitboards for each direction, then serialize into move objects
-std::vector<Move> MoveGen::getLegalMoves(Board::PieceColor color) {
+uint16_t MoveGen::getLegalMoves(Board::PieceColor color, std::array<Move, MAX_LEGAL_MOVES>& moveBuf) const {
    std::array<uint64_t, NUM_TOTAL_DIRECTIONS> moveTargets;
    std::array<uint64_t, NUM_ORTHOGONAL_DIRECTIONS> promoMoveTargets; //pawn promotion moves
 
@@ -316,14 +322,14 @@ std::vector<Move> MoveGen::getLegalMoves(Board::PieceColor color) {
    uint64_t allInBetween = horInBetween | verInBetween | diagInBetween | antiInBetween;
 
    uint64_t oppPawnAttacks = Board::pawnAttackTargets(oppPawns, oppColor);
-   uint64_t pawnCheckFrom = m_board->getPawnSquareAttacks(kingInd, color) & oppPawns;
+   uint64_t pawnCheckFrom = m_tables->getPawnSquareAttacks(kingInd, color) & oppPawns;
 
    uint64_t oppAnyAttacks = oppPawnAttacks | horSliderAttacks | verSliderAttacks | diagSliderAttacks | antiSliderAttacks 
          | Board::knightAttackTargets(oppKnights) | Board::kingAttackTargets(oppKing);
 
    uint64_t blocks = allInBetween & empty;
    uint64_t checkFrom = (kingSuperOrth & oppRookLike) | (kingSuperDiag & oppBishopLike) 
-         | pawnCheckFrom | (m_board->getKnightMoves(kingInd) & oppKnights);
+         | pawnCheckFrom | (m_tables->getKnightMoves(kingInd) & oppKnights);
 
    int64_t nullIfCheck = Board::nullBoolMask(oppAnyAttacks & king);
    int64_t nullIfDoubleCheck = Board::nullBoolMask(checkFrom & (checkFrom - 1));
@@ -336,11 +342,7 @@ std::vector<Move> MoveGen::getLegalMoves(Board::PieceColor color) {
    appendAntiSliderMoves(moveTargets, antiInBetween, allInBetween, bishopLike, empty, checkMask); //queen + bishop
    appendKnightMoves(moveTargets, knights, allInBetween, checkMask);
    appendPawnMoves(moveTargets, promoMoveTargets, pawns, pawnDir, oppPieces, epAttackTargets, verInBetween, diagInBetween, antiInBetween, allInBetween, empty, checkMask, color);
-   appendKingMoves(moveTargets, pieces, king, oppAnyAttacks, nullIfCheck, m_board->getKingCastleRights(color), m_board->getQueenCastleRights(color));
+   appendKingMoves(moveTargets, pieces, king, oppAnyAttacks, nullIfCheck, m_board->getKingCastleRights(color), m_board->getQueenCastleRights(color), occupied);
 
-   std::vector<Move> moves;
-   moves.reserve(MAX_LEGAL_MOVES);
-   serializeMoves(moves, moveTargets, promoMoveTargets, pawns, pawnDir, king, oppPieces, epAttackTargets, m_board->getOccupied());
-
-   return moves;
+   return serializeMoves(moveBuf, moveTargets, promoMoveTargets, pawns, pawnDir, king, oppPieces, epAttackTargets, m_board->getOccupied());
 }

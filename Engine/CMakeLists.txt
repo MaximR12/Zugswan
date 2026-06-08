@@ -8,6 +8,7 @@ target_sources(Engine PRIVATE
   src/MoveGen.cpp
   src/Board.cpp
   src/Engine.cpp
+  src/Tables.cpp
 )
 
 target_include_directories(Engine PUBLIC
@@ -15,5 +16,7 @@ target_include_directories(Engine PUBLIC
 )
 
 add_executable(ChessEngine Game.cpp)
+add_executable(PerftTests Perft.cpp)
 
 target_link_libraries(ChessEngine PRIVATE GUI Engine Rendering)
+target_link_libraries(PerftTests PRIVATE Engine)

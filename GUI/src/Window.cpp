@@ -4,10 +4,17 @@
 using namespace GUI;
 
 static void key_callback(GLFWwindow* window, int key, int scancode, int action, int mods) {
+    GameState* state = static_cast<GameState*>(glfwGetWindowUserPointer(window)); 
     switch(key) {
         case(GLFW_KEY_ESCAPE):
             if(action == GLFW_PRESS)
                 glfwSetWindowShouldClose(window, GLFW_TRUE);
+            break;
+        case(GLFW_KEY_E):
+            if(action == GLFW_PRESS) {
+                std::cout << "Unmaking move...\n";
+                state->unMakeMove();
+            }
             break;
     }
 }

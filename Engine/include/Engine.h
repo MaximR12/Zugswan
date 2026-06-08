@@ -5,11 +5,12 @@
 
 class Engine {
 private:
-    Board* const m_board;
+    Board* m_board;
     MoveGen* const m_moveGen;
     
 public:
     Engine(Board* board, MoveGen* moveGen) : m_board{board}, m_moveGen{moveGen} { }
 
     const Move getTopMove(const Board::PieceColor turn);
+    void updateBoard(Board* board) { m_board = board; }
 };

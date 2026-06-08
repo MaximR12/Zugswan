@@ -145,7 +145,10 @@ void RenderBoard(GLFWwindow* window, const GameState* state) {
         DrawPiece(window, xPos, yPos, (squareLen * width) / 2, piece);
     }
 
-    for(const auto& move : state->getLegalMoves()) { //draw highlighted squares
+    std::array<Move, MAX_LEGAL_MOVES> moveBuf;
+    uint16_t numMoves = state->getLegalMoves(moveBuf);
+    for(uint16_t i = 0; i < numMoves; ++i) { //draw highlighted squares
+        Move move = moveBuf[i];
         uint16_t from = move.getFrom(), to = move.getTo();
         if(from == state->getSelected()) {
             uint16_t row = GameState::getRow(to), col = GameState::getCol(to);
