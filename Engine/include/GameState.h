@@ -45,6 +45,7 @@ public:
     uint16_t getSelected() const { return m_selectedSquare; } 
     void setHighlighted(uint16_t sq) { m_highlightedSquares |= (1ULL << sq); }
 
+    void loadPosition(std::string FEN);
     void updateBoard() { m_board = &m_boardStack.back(); m_moveGen.updateBoard(m_board); m_engine.updateBoard(m_board); }
     void updateLegalMoves() { m_numLegalMoves = m_moveGen.getLegalMoves(m_playerTurn, m_currLegalMoves); }
     uint16_t getLegalMoves(std::array<Move, MAX_LEGAL_MOVES>& moveBuf) const { return m_moveGen.getLegalMoves(m_turn, moveBuf); };

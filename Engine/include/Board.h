@@ -7,6 +7,7 @@
 #include <bit>
 #include <bitset>
 #include "stdint.h"
+#include "Move.h"
 
 /*
 Board class encapsulating piece bitboards using little endian rank file mappings
@@ -84,8 +85,8 @@ class Board {
 private:
     std::array<std::array<uint64_t, NUM_PIECE_TYPES>, 2> m_pieceBB;
     std::array<uint64_t, 2> m_enPassantTargets;
-    std::array<uint64_t, 2> m_kingCastleRights;
-    std::array<uint64_t, 2> m_queenCastleRights;
+    std::array<bool, 2> m_kingCastleRights;
+    std::array<bool, 2> m_queenCastleRights;
     uint64_t m_emptyBB;
     uint64_t m_occupiedBB;
 
@@ -109,8 +110,8 @@ public:
 
     uint64_t getPieceSet(PieceType type, PieceColor color) const { return m_pieceBB[color][type]; }
     uint64_t getEnPassantTargets(PieceColor color) const { return m_enPassantTargets[color]; }
-    uint64_t getKingCastleRights(PieceColor color) const { return m_kingCastleRights[color]; }
-    uint64_t getQueenCastleRights(PieceColor color) const { return m_queenCastleRights[color]; }
+    bool getKingCastleRights(PieceColor color) const { return m_kingCastleRights[color]; }
+    bool getQueenCastleRights(PieceColor color) const { return m_queenCastleRights[color]; }
     uint64_t getOccupied() const { return m_occupiedBB; }
     uint64_t getEmpty() const { return m_emptyBB; }
 
@@ -119,10 +120,12 @@ public:
 
     void updateBB(PieceType type, PieceColor color, uint64_t BB) { m_pieceBB[color][type] = BB; }
     void updateEnPassantTargets(PieceColor color, uint64_t BB) { m_enPassantTargets[color] = BB; }
-    void updateKingCastleRights(PieceColor color, uint64_t BB) { m_kingCastleRights[color] = BB; }
-    void updateQueenCastleRights(PieceColor color, uint64_t BB) { m_queenCastleRights[color] = BB; }
+    void updateKingCastleRights(PieceColor color, bool castleRights) { m_kingCastleRights[color] = castleRights; }
+    void updateQueenCastleRights(PieceColor color, bool castleRights) { m_queenCastleRights[color] = castleRights; }
     void updateOccupiedBB(uint64_t BB) { m_occupiedBB = BB; }
     void updateEmptyBB(uint64_t BB) { m_emptyBB = BB; }
+    void clearPosition();
+    PieceColor loadPosition(std::string pos);
 
     static uint64_t getRayMoves(uint16_t ind, Directions dir);
     static uint64_t knightAttackTargets(uint64_t BB);
@@ -130,11 +133,14 @@ public:
     static uint64_t whitePawnTargets(uint64_t BB);
     static uint64_t blackPawnTargets(uint64_t BB);
     static uint64_t pawnAttackTargets(uint64_t pawns, PieceColor color); 
-    static uint64_t wpAttackTargetsSafe(uint64_t BB, uint64_t diagInBetween, uint64_t antiInBetween, uint64_t allInBetween); //pin safe pawn attack targets
-    static uint64_t bpAttackTargetsSafe(uint64_t BB, uint64_t diagInBetween, uint64_t antiInBetween, uint64_t allInBetween);
-    static uint64_t pawnAttackTargetsSafe(uint64_t pawns, PieceColor color, uint64_t diagInBetween, uint64_t antiInBetween, uint64_t allInBetween); 
+    static uint64_t wpAttackTargetsEastSafe(uint64_t BB, uint64_t diagInBetween, uint64_t antiInBetween, uint64_t allInBetween); //pin safe pawn attack targets
+    static uint64_t wpAttackTargetsWestSafe(uint64_t BB, uint64_t diagInBetween, uint64_t antiInBetween, uint64_t allInBetween);
+    static uint64_t bpAttackTargetsEastSafe(uint64_t BB, uint64_t diagInBetween, uint64_t antiInBetween, uint64_t allInBetween);
+    static uint64_t bpAttackTargetsWestSafe(uint64_t BB, uint64_t diagInBetween, uint64_t antiInBetween, uint64_t allInBetween);
+    static uint64_t pawnAttackTargetsSafe(uint64_t pawns, PieceColor color, Directions dir, uint64_t diagInBetween, uint64_t antiInBetween, uint64_t allInBetween); 
     static uint64_t pawnShift(uint64_t BB, Directions dir);
 
+    static int64_t fullBoolMask(bool cond) { return 0ULL - static_cast<uint64_t>(cond); }
     static int64_t fullBoolMask(uint64_t BB) { return 0ULL - static_cast<uint64_t>(BB != 0); }
     static int64_t nullBoolMask(uint64_t BB) { return 0ULL - static_cast<uint64_t>(BB == 0); }
 
@@ -182,6 +188,8 @@ public:
     static uint16_t serializeSingleBit(uint64_t BB) { return bitScanForward(BB); } //get square indices from bitboards
     static uint16_t serializeBitboard(uint64_t BB, std::array<uint16_t, NUM_SQUARES>& indBuf); //serialize into indBuf and return size
 
+    static std::string getIndexSquare(uint16_t index);
+    static std::string getMoveString(Move move);
     static void printBitBoard(uint64_t BB);
 };
 

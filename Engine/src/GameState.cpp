@@ -17,8 +17,8 @@ void updateCastleRights(Board* board, Board::PieceColor fromColor, uint64_t from
     uint64_t nullIfQueenRookMove = Board::nullBoolMask(fromBB & king >> 4);
     uint64_t nullIfKingMove = Board::nullBoolMask(fromBB & king);
 
-    board->updateKingCastleRights(fromColor, board->getKingCastleRights(fromColor) & nullIfKingRookMove & nullIfKingMove);
-    board->updateQueenCastleRights(fromColor, board->getQueenCastleRights(fromColor) & nullIfQueenRookMove & nullIfKingMove);
+    board->updateKingCastleRights(fromColor, (nullIfKingRookMove & nullIfKingMove) & Board::fullBoolMask(board->getKingCastleRights(fromColor)));
+    board->updateQueenCastleRights(fromColor, (nullIfQueenRookMove & nullIfKingMove) & Board::fullBoolMask(board->getQueenCastleRights(fromColor)));
 }
 
 void updateOccupied(Board* board, uint64_t occupied) {
@@ -37,7 +37,7 @@ void removePiece(Board* board, Board::PieceType type, Board::PieceColor color, u
 }
 
 void GameState::makeMove(Move move) {
-    m_boardStack.push_back(*m_board);
+    m_boardStack.emplace_back(*m_board);
     updateBoard();
 
     uint16_t fromInd = move.getFrom(), toInd = move.getTo();
@@ -82,18 +82,7 @@ void GameState::makeMove(Move move) {
                 | (Board::westFill(rookLike, emptyBeforeMove) & Board::eastFill(oppKing, emptyBeforeMove));
             uint64_t horPinnedMask = Board::nullBoolMask(horInBetween & epCapturers);
 
-            //diaganol pin test of ep target pawn
-            uint64_t king = m_board->getPieceSet(Board::king, fromColor);
-            uint64_t oppBishopLike = m_board->getPieceSet(Board::bishops, oppColor) | m_board->getPieceSet(Board::queens, oppColor);
-
-            uint64_t diagInBetween = (Board::northEastFill(oppBishopLike, empty) & Board::southWestFill(king, empty))
-                | (Board::southWestFill(oppBishopLike, empty) & Board::northEastFill(king, empty));
-            uint64_t antiInBetween = (Board::northWestFill(oppBishopLike, empty) & Board::southEastFill(king, empty))
-                | (Board::southEastFill(oppBishopLike, empty) & Board::northWestFill(king, empty));
-            uint64_t diagPinnedMask = Board::nullBoolMask((diagInBetween | antiInBetween) & toBB);
-
-            uint64_t legalEpMask = horPinnedMask & diagPinnedMask;
-            m_board->updateEnPassantTargets(oppColor, epTarget & legalEpMask);
+            m_board->updateEnPassantTargets(oppColor, epTarget & horPinnedMask);
             break;
         }
 
@@ -164,7 +153,7 @@ void GameState::makeMove(Move move) {
 
         default:
             break;
-    }
+    }    
 
     switchTurn();
 }
@@ -194,6 +183,15 @@ void GameState::handleClick(int square) {
 
     m_selectedSquare = square;
 } 
+
+void GameState::loadPosition(std::string FEN) {
+    m_boardStack.clear();
+    m_boardStack.emplace_back();
+    m_turn = m_boardStack.back().loadPosition(FEN);
+    updateBoard();
+
+    m_numLegalMoves = m_moveGen.getLegalMoves(m_playerTurn, m_currLegalMoves);
+}
 
 void appendPieces(std::vector<Piece>& pieceList, std::array<uint16_t, NUM_SQUARES>& indBuf, uint16_t numPieces, const Board::PieceColor& color, const Board::PieceType& type) {
     for(int i = 0; i < numPieces; ++i) {

@@ -14,7 +14,7 @@ const Move Engine::getTopMove(const Board::PieceColor turn) {
     auto dur = std::chrono::duration_cast<std::chrono::nanoseconds>(end - start);
     total += dur, count++;
 
-    std::cout << "Move gen time: " << dur << " Current Average: " << total / count << '\n';
+    // std::cout << "Move gen time: " << dur << " Current Average: " << total / count << '\n';
 
     int ind = std::rand() % numMoves;
     return moveBuf[ind];
