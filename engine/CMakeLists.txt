@@ -15,8 +15,10 @@ target_include_directories(Engine PUBLIC
   ${CMAKE_CURRENT_SOURCE_DIR}/include
 )
 
-add_executable(ChessEngine Game.cpp)
-add_executable(PerftTests Perft.cpp)
+add_executable(ChessEngine src/Game.cpp)
+add_executable(PerftTest tests/Perft.cpp)
+add_executable(PerftBulkTest tests/PerftBulk.cpp)
 
 target_link_libraries(ChessEngine PRIVATE GUI Engine Rendering)
-target_link_libraries(PerftTests PRIVATE Engine)
+target_link_libraries(PerftTest PRIVATE Engine)
+target_link_libraries(PerftBulkTest PRIVATE Engine)

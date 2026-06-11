@@ -1,26 +1,35 @@
 #include "Board.h"
 
-uint64_t Board::wpAttackTargetsSafe(uint64_t wPawns, uint64_t diagInBetween, uint64_t antiInBetween, uint64_t allInBetween) {
-    uint64_t pinSafe = wPawns & ~(allInBetween ^ diagInBetween);
-    uint64_t westAttacks = Board::shiftNorthWest(pinSafe);
-    pinSafe = wPawns & ~(allInBetween ^ antiInBetween);
-    uint64_t eastAttacks = Board::shiftNorthEast(pinSafe); 
-    return westAttacks | eastAttacks;
+#include <unordered_map>
+#include <sstream>
+
+uint64_t Board::wpAttackTargetsEastSafe(uint64_t wPawns, uint64_t diagInBetween, uint64_t antiInBetween, uint64_t allInBetween) {
+    uint64_t pinSafe = wPawns & ~(allInBetween ^ diagInBetween); 
+    return Board::shiftNorthEast(pinSafe);
 }
 
-uint64_t Board::bpAttackTargetsSafe(uint64_t bPawns, uint64_t diagInBetween, uint64_t antiInBetween, uint64_t allInBetween) {
-    uint64_t pinSafe = bPawns & ~(allInBetween ^ antiInBetween);
-    uint64_t westAttacks = Board::shiftSouthWest(pinSafe);
-    pinSafe = bPawns & ~(allInBetween ^ diagInBetween);
-    uint64_t eastAttacks = Board::shiftSouthEast(pinSafe); 
-    return westAttacks | eastAttacks;
+uint64_t Board::wpAttackTargetsWestSafe(uint64_t wPawns, uint64_t diagInBetween, uint64_t antiInBetween, uint64_t allInBetween) {
+    uint64_t pinSafe = wPawns & ~(allInBetween ^ antiInBetween);
+    return Board::shiftNorthWest(pinSafe);
+}
+
+uint64_t Board::bpAttackTargetsEastSafe(uint64_t bPawns, uint64_t diagInBetween, uint64_t antiInBetween, uint64_t allInBetween) {
+    uint64_t pinSafe = bPawns & ~(allInBetween ^ antiInBetween); 
+    return Board::shiftSouthEast(pinSafe);
+}
+
+uint64_t Board::bpAttackTargetsWestSafe(uint64_t bPawns, uint64_t diagInBetween, uint64_t antiInBetween, uint64_t allInBetween) {
+    uint64_t pinSafe = bPawns & ~(allInBetween ^ diagInBetween); 
+    return Board::shiftSouthWest(pinSafe);
 }
 
 //maps to correct safe pawn attack func given north or south pawn direction
-constinit const std::array<uint64_t (*)(uint64_t, uint64_t, uint64_t, uint64_t), 2> pawnSafeAttackFuncMap { Board::wpAttackTargetsSafe, Board::bpAttackTargetsSafe };
+constinit const std::array<uint64_t (*)(uint64_t, uint64_t, uint64_t, uint64_t), 4> pawnSafeAttackFuncMap { 
+    Board::wpAttackTargetsEastSafe, Board::bpAttackTargetsEastSafe, Board::wpAttackTargetsWestSafe, Board::bpAttackTargetsWestSafe 
+};
 
-uint64_t Board::pawnAttackTargetsSafe(uint64_t pawns, PieceColor color, uint64_t diagInBetween, uint64_t antiInBetween, uint64_t allInBetween) { 
-    uint64_t (*func)(uint64_t, uint64_t, uint64_t, uint64_t) = pawnSafeAttackFuncMap[color];
+uint64_t Board::pawnAttackTargetsSafe(uint64_t pawns, PieceColor color, Directions dir, uint64_t diagInBetween, uint64_t antiInBetween, uint64_t allInBetween) { 
+    uint64_t (*func)(uint64_t, uint64_t, uint64_t, uint64_t) = pawnSafeAttackFuncMap[(dir%2)*2 + color];
     return func(pawns, diagInBetween, antiInBetween, allInBetween);
 }
 
@@ -163,10 +172,10 @@ Board::Board() {
     m_emptyBB = ~m_occupiedBB;
     m_enPassantTargets[white] = EMPTY;
     m_enPassantTargets[black] = EMPTY;
-    m_kingCastleRights[white] = UNIVERSE;
-    m_kingCastleRights[black] = UNIVERSE;
-    m_queenCastleRights[white] = UNIVERSE;
-    m_queenCastleRights[black] = UNIVERSE;
+    m_kingCastleRights[white] = true;
+    m_kingCastleRights[black] = true;
+    m_queenCastleRights[white] = true;
+    m_queenCastleRights[black] = true;
 }
 
 uint64_t Board::northFill(uint64_t sliders, uint64_t empty) {
@@ -273,10 +282,89 @@ uint16_t Board::serializeBitboard(uint64_t BB, std::array<uint16_t, NUM_SQUARES>
     return count;
 }
 
+void Board::clearPosition() {
+    for(int color = 0; color < 2; ++color)
+        for(int type = 0; type < NUM_PIECE_TYPES; ++type)
+            updateBB(static_cast<Board::PieceType>(type), static_cast<Board::PieceColor>(color), EMPTY);
+
+    updateOccupiedBB(EMPTY);
+    updateEmptyBB(UNIVERSE);
+}
+
+Board::PieceColor Board::loadPosition(std::string FEN) {
+    std::stringstream ss(FEN);
+    std::string pos, side, castleRights, epTarget;
+    ss >> pos >> side >> castleRights >> epTarget;
+    PieceColor turn = side == "w" ? white : black;
+
+    std::unordered_map<char, PieceType> typeMap {
+        {'P', pawns}, {'N', knights}, {'B', bishops}, {'R', rooks}, {'Q', queens}, {'K', king}
+    };
+
+    clearPosition();
+    uint16_t rank = 7, file = 0, index;
+    for(char c : pos) {
+        if(c == '/') {
+            --rank, file = 0;    
+            continue;
+        }
+        if(c < 65) {
+            file += (c - '0');
+            continue;
+        }
+
+        PieceColor color = c > 90 ? black : white;
+        if(c > 90) c -= 32;
+        PieceType type = typeMap[c];
+
+        index = rank * 8 + file; 
+        updateBB(type, color, getPieceSet(type, color) | (1ULL << index));
+        updateBB(all, color, getPieceSet(all, color) | (1ULL << index));
+
+        ++file;
+    }
+
+    updateOccupiedBB(getPieceSet(all, black) | getPieceSet(all, white));
+    updateEmptyBB(~getOccupied());
+
+    m_kingCastleRights = {false, false}, m_queenCastleRights = {false, false};
+    for(char c : castleRights) {
+        if(c == '-') 
+            break;
+
+        PieceColor color = c > 90 ? black : white;
+        if(c > 90) c -= 32;
+
+        if(typeMap[c] == king) m_kingCastleRights[color] = true;
+        else m_queenCastleRights[color] = true;
+    }
+
+    if(epTarget != "-") {
+        int file = epTarget[0] - 96, rank = epTarget[1] - '0';
+        uint16_t index = 8 * (rank-1) + file-1;
+        
+        updateEnPassantTargets(turn, 1ULL<<index);
+    }
+
+    return turn;
+}
+
+std::string Board::getIndexSquare(uint16_t index) {
+    char rank = (index / 8 + 1) + '0';
+    char file = index % 8 + 'a';
+    return std::string{file} + std::string{rank}; 
+}
+
+std::string Board::getMoveString(Move move) {
+    uint16_t from = move.getFrom(), to = move.getTo();
+    return getIndexSquare(from) + getIndexSquare(to);
+}
+
 void Board::printBitBoard(uint64_t BB) {
     std::bitset<64> bb{BB};
     for(int i = 63; i >= 0; --i) {
         std::cout << bb[i]; 
         if(i % 8 == 0) std::cout << '\n';
     }
+    std::cout << '\n';
 }
