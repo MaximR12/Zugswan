@@ -293,8 +293,8 @@ void Board::clearPosition() {
 
 Board::PieceColor Board::loadPosition(std::string FEN) {
     std::stringstream ss(FEN);
-    std::string pos, side, castleRights, epTarget;
-    ss >> pos >> side >> castleRights >> epTarget;
+    std::string pos, side, castleRights, epTarget, moveClock, halfMoveClock;
+    ss >> pos >> side >> castleRights >> epTarget >> moveClock >> halfMoveClock;
     PieceColor turn = side == "w" ? white : black;
 
     std::unordered_map<char, PieceType> typeMap {

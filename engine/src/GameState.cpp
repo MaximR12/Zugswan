@@ -1,14 +1,13 @@
 #include "GameState.h"
 #include <chrono>
 
-GameState::GameState() : m_playerTurn{Board::white}, m_turn{Board::white}, m_moveGen{m_board, &m_tables}, m_engine{m_board, &m_moveGen}, m_currLegalMoves{}, 
+GameState::GameState() : m_turn{Board::white}, m_moveGen{m_board, &m_tables}, m_engine{m_board, &m_moveGen}, m_currLegalMoves{}, 
         m_selectedSquare{UNDEFINED_SQUARE} 
 { 
     m_boardStack.reserve(INIT_STACK_SIZE);
     m_boardStack.emplace_back();
     updateBoard();
-
-    m_numLegalMoves = m_moveGen.getLegalMoves(m_playerTurn, m_currLegalMoves);     
+    updateLegalMoves();   
 }
 
 void updateCastleRights(Board* board, Board::PieceColor fromColor, uint64_t fromBB) {
@@ -162,7 +161,6 @@ void GameState::unMakeMove() {
     if(m_boardStack.size() > 1) {
         m_boardStack.pop_back();
         updateBoard();
-        updateLegalMoves();
         switchTurn();
     }
 }
@@ -177,6 +175,7 @@ void GameState::handleClick(int square) {
         if(m_selectedSquare == move.getFrom() && square == move.getTo()) {
             m_selectedSquare = UNDEFINED_SQUARE;
             makeMove(move);
+            updateLegalMoves();
             return;
         }
     }
@@ -190,7 +189,7 @@ void GameState::loadPosition(std::string FEN) {
     m_turn = m_boardStack.back().loadPosition(FEN);
     updateBoard();
 
-    m_numLegalMoves = m_moveGen.getLegalMoves(m_playerTurn, m_currLegalMoves);
+    m_numLegalMoves = m_moveGen.getLegalMoves(m_turn, m_currLegalMoves);
 }
 
 void appendPieces(std::vector<Piece>& pieceList, std::array<uint16_t, NUM_SQUARES>& indBuf, uint16_t numPieces, const Board::PieceColor& color, const Board::PieceType& type) {
@@ -201,7 +200,7 @@ void appendPieces(std::vector<Piece>& pieceList, std::array<uint16_t, NUM_SQUARE
     }
 }
 
-std::vector<Piece> GameState::getPieceList() const {
+std::vector<Piece> GameState::getPieceList(Board* board) {
     std::vector<Piece> pieceList;
     pieceList.reserve(NUM_SQUARES);
     std::array<uint16_t, NUM_SQUARES> indBuf;
@@ -210,7 +209,7 @@ std::vector<Piece> GameState::getPieceList() const {
         for(int pieceType = Board::pawns; pieceType <= Board::king; ++pieceType) {
             Board::PieceType type = static_cast<Board::PieceType>(pieceType);
             Board::PieceColor color = static_cast<Board::PieceColor>(pieceColor);
-            uint16_t numPieces = Board::serializeBitboard(m_board->getPieceSet(type, color), indBuf);
+            uint16_t numPieces = Board::serializeBitboard(board->getPieceSet(type, color), indBuf);
 
             appendPieces(pieceList, indBuf, numPieces, color, type);
         }

@@ -116,7 +116,7 @@ void DrawCircle(float xPos, float yPos, float radius, int resolution) {
     glDrawElements(GL_TRIANGLES, resolution * 3, GL_UNSIGNED_INT, 0);
 }
 
-void RenderBoard(GLFWwindow* window, const GameState* state) {
+void RenderBoard(GLFWwindow* window, RenderState* state) {
     glClearColor(0.2f, 0.3f, 0.3f, 1.0f);
     glClear(GL_COLOR_BUFFER_BIT);
 
@@ -138,19 +138,18 @@ void RenderBoard(GLFWwindow* window, const GameState* state) {
         }
     }
 
-    std::vector<Piece> pieceList = state->getPieceList();
+    std::vector<Piece> pieceList = GameState::getPieceList(&state->board);
     for(const auto& piece : pieceList) { //draw pieces
         float xPos = (start_x + piece.getCol() * squareLen + 1.0f) * (width/2); 
         float yPos = (1.0f - start_y + (7 - piece.getRow()) * squareLen) * (height/2);
         DrawPiece(window, xPos, yPos, (squareLen * width) / 2, piece);
     }
 
-    std::array<Move, MAX_LEGAL_MOVES> moveBuf;
-    uint16_t numMoves = state->getLegalMoves(moveBuf);
-    for(uint16_t i = 0; i < numMoves; ++i) { //draw highlighted squares
-        Move move = moveBuf[i];
+    std::array<Move, MAX_LEGAL_MOVES> moves = state->legalMoves;
+    for(uint16_t i = 0; i < state->numLegalMoves; ++i) { //draw highlighted squares
+        Move move = moves[i];
         uint16_t from = move.getFrom(), to = move.getTo();
-        if(from == state->getSelected()) {
+        if(from == state->selected) {
             uint16_t row = GameState::getRow(to), col = GameState::getCol(to);
             float xPos = start_x + col * squareLen, yPos = start_y - row * squareLen, radius = squareLen / 5;
             DrawCircle(xPos + squareLen/2, yPos + squareLen/2, radius, CIRCLE_RES);
@@ -158,11 +157,7 @@ void RenderBoard(GLFWwindow* window, const GameState* state) {
     }
 }
 
-void Renderer::RenderFrame(Window& window) {
-    GLFWwindow* glfw_window = window.getWindow();
-
-    RenderBoard(glfw_window, m_state);
-
-    glfwSwapBuffers(glfw_window);
-    glfwPollEvents();
+void Renderer::RenderFrame(GLFWwindow* window) {
+    RenderBoard(window, m_state);
+    glfwSwapBuffers(window);
 }

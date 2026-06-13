@@ -54,23 +54,23 @@ constexpr uint64_t BLACK_QUEENS = 0x0800000000000000ULL;
 constexpr uint64_t WHITE_KING = 0x0000000000000010ULL; 
 constexpr uint64_t BLACK_KING = 0x1000000000000000ULL;
 
-constexpr uint16_t northOffset = 8;
-constexpr uint16_t southOffset = -8;
-constexpr uint16_t eastOffset = 1;
-constexpr uint16_t westOffset = -1;
-constexpr uint16_t northEastOffset = 9;
-constexpr uint16_t northWestOffset = 7;
-constexpr uint16_t southEastOffset = -7;
-constexpr uint16_t southWestOffset = -9;
+constexpr int16_t northOffset = 8;
+constexpr int16_t southOffset = -8;
+constexpr int16_t eastOffset = 1;
+constexpr int16_t westOffset = -1;
+constexpr int16_t northEastOffset = 9;
+constexpr int16_t northWestOffset = 7;
+constexpr int16_t southEastOffset = -7;
+constexpr int16_t southWestOffset = -9;
 
-constexpr uint16_t northNorthEastOffset = 17;
-constexpr uint16_t northEastEastOffset = 10;
-constexpr uint16_t northNorthWestOffset = 15;
-constexpr uint16_t northWestWestOffset = 6;
-constexpr uint16_t southSouthEastOffset = -15;
-constexpr uint16_t southEastEastOffset = -6;
-constexpr uint16_t southSouthWestOffset = -17;
-constexpr uint16_t southWestWestOffset = -10;
+constexpr int16_t northNorthEastOffset = 17;
+constexpr int16_t northEastEastOffset = 10;
+constexpr int16_t northNorthWestOffset = 15;
+constexpr int16_t northWestWestOffset = 6;
+constexpr int16_t southSouthEastOffset = -15;
+constexpr int16_t southEastEastOffset = -6;
+constexpr int16_t southSouthWestOffset = -17;
+constexpr int16_t southWestWestOffset = -10;
 
 constexpr int MAX_LEGAL_MOVES = 256;
 constexpr int NUM_PIECE_TYPES = 8;
@@ -175,8 +175,8 @@ public:
     static uint64_t southWestFill(uint64_t sliders, uint64_t empty);
 
     static Directions getPawnDirection(PieceColor color);
-    static uint16_t getDirectionOffset(Directions dir);
-    static uint16_t getDirectionOffset(int dir);
+    static int16_t getDirectionOffset(Directions dir);
+    static int16_t getDirectionOffset(int dir);
     static Directions getOppositeDirection(int dir);
     static Directions getOppositeDirection(Directions dir);
     static PieceColor getOppositeColor(PieceColor color) { return static_cast<Board::PieceColor>((color + 1)%2); }
@@ -216,12 +216,12 @@ inline consteval std::array<Board::Directions, NUM_TOTAL_DIRECTIONS> genOpposite
 inline constinit const std::array<int16_t, NUM_TOTAL_DIRECTIONS> directionOffsetTable { genDirectionOffsetTable() }; 
 inline constinit const std::array<Board::Directions, NUM_TOTAL_DIRECTIONS> oppositeDirectionTable { genOppositeDirectionTable() }; 
 
-inline uint16_t Board::getDirectionOffset(Directions dir) { 
+inline int16_t Board::getDirectionOffset(Directions dir) { 
     assert(dir >= 0 && dir <= NUM_TOTAL_DIRECTIONS);
     return directionOffsetTable[dir];
 }
 
-inline uint16_t Board::getDirectionOffset(int dir) { 
+inline int16_t Board::getDirectionOffset(int dir) { 
     assert(dir >= 0 && dir <= NUM_TOTAL_DIRECTIONS);
     return directionOffsetTable[dir];
 }

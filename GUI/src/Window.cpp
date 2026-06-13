@@ -1,10 +1,11 @@
 #include "Window.h"
 #include "GraphicsIncludes.h"
+#include "Game.h"
 
 using namespace GUI;
 
 static void key_callback(GLFWwindow* window, int key, int scancode, int action, int mods) {
-    GameState* state = static_cast<GameState*>(glfwGetWindowUserPointer(window)); 
+    Game* game = static_cast<Game*>(glfwGetWindowUserPointer(window)); 
     switch(key) {
         case(GLFW_KEY_ESCAPE):
             if(action == GLFW_PRESS)
@@ -13,14 +14,14 @@ static void key_callback(GLFWwindow* window, int key, int scancode, int action, 
         case(GLFW_KEY_E):
             if(action == GLFW_PRESS) {
                 std::cout << "Unmaking move...\n";
-                state->unMakeMove();
+                game->unMakeMove();
             }
             break;
     }
 }
 
 static void mouse_callback(GLFWwindow* window, int button, int action, int mods) {
-    GameState* state = static_cast<GameState*>(glfwGetWindowUserPointer(window)); 
+    Game* game = static_cast<Game*>(glfwGetWindowUserPointer(window)); 
 
     if(button != GLFW_MOUSE_BUTTON_1) {
         return;
@@ -39,7 +40,7 @@ static void mouse_callback(GLFWwindow* window, int button, int action, int mods)
         const int square = (7 - row) * 8 + col;
         
         if(col >= 0 && row >= 0 && col < squares_per_side && row < squares_per_side) {
-            state->handleClick(square);
+            game->handleClick(square);
         }
     }
 }
@@ -52,7 +53,7 @@ static void framebuffer_size_callback(GLFWwindow* window, int width, int height)
     glViewport(0, 0, width, height);
 } 
 
-Window::Window(const char* title, int width, int height, GameState* state) : m_windowInfo {title, width, height} {
+Window::Window(const char* title, int width, int height, Game* game) : m_windowInfo {title, width, height} {
     glfwSetErrorCallback(error_callback);
 
     if(!glfwInit())
@@ -71,7 +72,7 @@ Window::Window(const char* title, int width, int height, GameState* state) : m_w
     }
 
     glfwSetFramebufferSizeCallback(m_window, framebuffer_size_callback);  
-    glfwSetWindowUserPointer(m_window, state);
+    glfwSetWindowUserPointer(m_window, game);
     glfwSetKeyCallback(m_window, key_callback);
     glfwSetMouseButtonCallback(m_window, mouse_callback);
 

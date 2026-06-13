@@ -11,9 +11,15 @@
 constexpr int UNDEFINED_SQUARE = 65;
 constexpr int INIT_STACK_SIZE = 256;
 
+typedef struct RenderState {
+    Board board;
+    uint16_t selected;
+    uint16_t numLegalMoves;
+    std::array<Move, MAX_LEGAL_MOVES> legalMoves;
+} RenderState;
+
 class GameState {
 private:
-    const Board::PieceColor m_playerTurn;
     Board::PieceColor m_turn;
     std::vector<Board> m_boardStack;
     Board* m_board;
@@ -27,7 +33,6 @@ private:
     std::vector<Move> m_moveList;
 
     uint16_t m_selectedSquare;
-    uint64_t m_highlightedSquares;
     
 public:
     GameState();
@@ -37,20 +42,18 @@ public:
     void playEngineMove();
 
     void switchTurn() { m_turn = Board::getOppositeColor(m_turn); }
-    const Board::PieceColor getTurn() { return m_turn; }
-    const Board::PieceColor playerTurn() { return m_playerTurn; }
-
+    const Board::PieceColor getTurn() const { return m_turn; }
     
     void handleClick(int square);
     uint16_t getSelected() const { return m_selectedSquare; } 
-    void setHighlighted(uint16_t sq) { m_highlightedSquares |= (1ULL << sq); }
 
     void loadPosition(std::string FEN);
+    void updateRenderState(RenderState& rState) { rState.board = *m_board; rState.selected = m_selectedSquare; rState.legalMoves = m_currLegalMoves; rState.numLegalMoves = m_numLegalMoves; }
     void updateBoard() { m_board = &m_boardStack.back(); m_moveGen.updateBoard(m_board); m_engine.updateBoard(m_board); }
-    void updateLegalMoves() { m_numLegalMoves = m_moveGen.getLegalMoves(m_playerTurn, m_currLegalMoves); }
+    void updateLegalMoves() { m_numLegalMoves = m_moveGen.getLegalMoves(m_turn, m_currLegalMoves); }
     uint16_t getLegalMoves(std::array<Move, MAX_LEGAL_MOVES>& moveBuf) const { return m_moveGen.getLegalMoves(m_turn, moveBuf); };
-    std::vector<Piece> getPieceList() const;
-
+    
+    static std::vector<Piece> getPieceList(Board* board);
     static uint16_t getRow(uint16_t sq) { return ROW_LEN - sq / ROW_LEN; }
     static uint16_t getCol(uint16_t sq) { return sq % ROW_LEN; }
 };
