@@ -9,6 +9,7 @@ target_sources(Engine PRIVATE
   src/Board.cpp
   src/Engine.cpp
   src/Tables.cpp
+  tests/Perft.cpp
 )
 
 target_include_directories(Engine PUBLIC
@@ -16,9 +17,9 @@ target_include_directories(Engine PUBLIC
 )
 
 add_executable(ChessEngine src/Game.cpp)
-add_executable(PerftTest tests/Perft.cpp)
-add_executable(PerftBulkTest tests/PerftBulk.cpp)
+# add_executable(PerftTest tests/Perft.cpp)
+# add_executable(PerftBulkTest tests/PerftBulk.cpp)
 
 target_link_libraries(ChessEngine PRIVATE GUI Engine Rendering)
-target_link_libraries(PerftTest PRIVATE Engine)
-target_link_libraries(PerftBulkTest PRIVATE Engine)
+# target_link_libraries(PerftTest PRIVATE Engine)
+# target_link_libraries(PerftBulkTest PRIVATE Engine)

@@ -1,9 +1,9 @@
 #pragma once
 
 #include <iostream>
-#include "GameState.h"
 
 struct GLFWwindow;
+class Game;
 
 namespace GUI {
     struct WindowInfo {
@@ -25,7 +25,7 @@ namespace GUI {
         GLFWwindow* m_window;
 
     public:
-        Window(const char* title, int width, int height, GameState* state);
+        Window(const char* title, int width, int height, Game* game);
         ~Window();
 
         GLFWwindow* getWindow() { return m_window; }

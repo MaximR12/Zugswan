@@ -240,7 +240,7 @@ uint16_t MoveGen::getLegalMoves(Board::PieceColor color, std::array<Move, MAX_LE
    uint64_t rookLike = m_board->getPieceSet(Board::rooks, color) | m_board->getPieceSet(Board::queens, color);
    uint64_t bishopLike = m_board->getPieceSet(Board::bishops, color) | m_board->getPieceSet(Board::queens, color);
    uint64_t knights = m_board->getPieceSet(Board::knights, color);
-   uint64_t epAttackTargets = m_board->getEnPassantTargets(color);
+   uint64_t epTarget = m_board->getEnPassantTargets(color);
    uint64_t oppPieces = m_board->getPieceSet(Board::all, oppColor);
    uint64_t oppKing = m_board->getPieceSet(Board::king, oppColor);
    uint64_t oppPawns = m_board->getPieceSet(Board::pawns, oppColor);
@@ -302,14 +302,15 @@ uint16_t MoveGen::getLegalMoves(Board::PieceColor color, std::array<Move, MAX_LE
    int64_t nullIfDoubleCheck = Board::nullBoolMask(checkFrom & (checkFrom - 1));
    uint64_t checkTo = checkFrom | blocks | nullIfCheck;
    uint64_t checkMask = ~pieces & checkTo & nullIfDoubleCheck;
+   uint64_t pawnCheckMask = checkMask | (epTarget & Board::pawnShift(checkFrom, pawnDir));
 
    appendHorSliderMoves(moveTargets, horInBetween, allInBetween, rookLike, empty, checkMask); //queen + rook
    appendVerSliderMoves(moveTargets, verInBetween, allInBetween, rookLike, empty, checkMask); //queen + rook
    appendDiagSliderMoves(moveTargets, diagInBetween, allInBetween, bishopLike, empty, checkMask); //queen + bishop
    appendAntiSliderMoves(moveTargets, antiInBetween, allInBetween, bishopLike, empty, checkMask); //queen + bishop
    appendKnightMoves(moveTargets, knights, allInBetween, checkMask);
-   appendPawnMoves(moveTargets, promoMoveTargets, pawns, pawnDir, oppPieces, epAttackTargets, verInBetween, diagInBetween, antiInBetween, allInBetween, empty, checkMask, color);
+   appendPawnMoves(moveTargets, promoMoveTargets, pawns, pawnDir, oppPieces, epTarget, verInBetween, diagInBetween, antiInBetween, allInBetween, empty, pawnCheckMask, color);
    appendKingMoves(moveTargets, pieces, king, rooks, oppAnyAttacks, nullIfCheck, m_board->getKingCastleRights(color), m_board->getQueenCastleRights(color), occupied, empty);
 
-   return serializeMoves(moveBuf, moveTargets, promoMoveTargets, pawns, pawnDir, king, oppPieces, epAttackTargets, m_board->getOccupied());
+   return serializeMoves(moveBuf, moveTargets, promoMoveTargets, pawns, pawnDir, king, oppPieces, epTarget, m_board->getOccupied());
 }

@@ -9,11 +9,11 @@ namespace GUI {
 
     class Renderer {
     private:
-        const GameState* m_state;
+        RenderState* m_state;
 
     public:
-        Renderer(const GameState& state) : m_state {&state} { }
+        Renderer(RenderState* state) : m_state {state} { }
 
-        void RenderFrame(Window& window);
+        void RenderFrame(GLFWwindow* window);
     };
 }
