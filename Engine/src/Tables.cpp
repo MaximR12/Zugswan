@@ -1,4 +1,4 @@
-#include "Tables.h"
+#include "tables.hpp"
 
 void initPawnAttackTables(std::array<std::array<uint64_t, NUM_SQUARES>, 2>& pawnAttackTable) {
     uint64_t currBB = 1;

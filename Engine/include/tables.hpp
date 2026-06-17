@@ -1,7 +1,7 @@
 #pragma once
 
 #include <array>
-#include "Board.h"
+#include "board.hpp"
 
 class Tables {
 private:

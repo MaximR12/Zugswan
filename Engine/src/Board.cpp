@@ -1,7 +1,8 @@
-#include "Board.h"
+#include "board.hpp"
 
 #include <unordered_map>
 #include <sstream>
+#include <format>
 
 uint64_t Board::wpAttackTargetsEastSafe(uint64_t wPawns, uint64_t diagInBetween, uint64_t antiInBetween, uint64_t allInBetween) {
     uint64_t pinSafe = wPawns & ~(allInBetween ^ diagInBetween); 
@@ -282,19 +283,37 @@ uint16_t Board::serializeBitboard(uint64_t BB, std::array<uint16_t, NUM_SQUARES>
     return count;
 }
 
+int materialCount(Board* board, Board::PieceColor side) {
+    std::unordered_map<int, int> valueMap {
+        {Board::pawns, 1}, {Board::knights, 3}, {Board::bishops, 3}, {Board::rooks, 5}, {Board::queens, 9}
+    };
+
+    int material = 0;
+    for(int type = 0; type < 6; ++type) {
+        int count = std::popcount(board->getPieceSet(static_cast<Board::PieceType>(type), Board::white));
+        material += count * valueMap[type];
+    }
+
+    return material;
+}
+
+int Board::materialBalance(Board* board) {
+    return materialCount(board, white) - materialCount(board, black);
+}
+
 void Board::clearPosition() {
     for(int color = 0; color < 2; ++color)
         for(int type = 0; type < NUM_PIECE_TYPES; ++type)
-            updateBB(static_cast<Board::PieceType>(type), static_cast<Board::PieceColor>(color), EMPTY);
+            updateBB(static_cast<PieceType>(type), static_cast<PieceColor>(color), EMPTY);
 
     updateOccupiedBB(EMPTY);
     updateEmptyBB(UNIVERSE);
 }
 
-Board::PieceColor Board::loadPosition(std::string FEN) {
-    std::stringstream ss(FEN);
+Board::PieceColor Board::loadPosition(std::string& fen) {
+    std::istringstream is(fen);
     std::string pos, side, castleRights, epTarget, moveClock, halfMoveClock;
-    ss >> pos >> side >> castleRights >> epTarget >> moveClock >> halfMoveClock;
+    is >> pos >> side >> castleRights >> epTarget >> moveClock >> halfMoveClock;
     PieceColor turn = side == "w" ? white : black;
 
     std::unordered_map<char, PieceType> typeMap {
@@ -349,7 +368,16 @@ Board::PieceColor Board::loadPosition(std::string FEN) {
     return turn;
 }
 
-std::string Board::getIndexSquare(uint16_t index) {
+uint16_t Board::getIndexSquare(std::string square) {
+    assert(square.size() == 2);
+    char first = square[0], second = square[1];
+    uint16_t rank = second - '0';
+    uint16_t file = first - 'a';
+    return (rank-1) * 8 + file;
+}
+
+std::string Board::getIndexStr(uint16_t index) {
+    assert(index < NUM_SQUARES);
     char rank = (index / 8 + 1) + '0';
     char file = index % 8 + 'a';
     return std::string{file} + std::string{rank}; 
@@ -357,7 +385,7 @@ std::string Board::getIndexSquare(uint16_t index) {
 
 std::string Board::getMoveString(Move move) {
     uint16_t from = move.getFrom(), to = move.getTo();
-    return getIndexSquare(from) + getIndexSquare(to);
+    return std::format("{}{}", getIndexStr(from), getIndexStr(to));
 }
 
 void Board::printBitBoard(uint64_t BB) {

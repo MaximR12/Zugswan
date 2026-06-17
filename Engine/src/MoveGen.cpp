@@ -1,4 +1,4 @@
-#include "MoveGen.h"
+#include "movegen.hpp"
 #include <array>
 #include <unordered_map>
 

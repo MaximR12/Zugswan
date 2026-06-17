@@ -1,7 +1,7 @@
-#include "GameState.h"
+#include "gamestate.hpp"
 #include <chrono>
 
-GameState::GameState() : m_turn{Board::white}, m_moveGen{m_board, &m_tables}, m_engine{m_board, &m_moveGen}, m_currLegalMoves{}, 
+GameState::GameState() : m_turn{Board::white}, m_moveGen{m_board, &m_tables}, m_currLegalMoves{}, 
         m_selectedSquare{UNDEFINED_SQUARE} 
 { 
     m_boardStack.reserve(INIT_STACK_SIZE);
@@ -165,11 +165,6 @@ void GameState::unMakeMove() {
     }
 }
 
-void GameState::playEngineMove() {
-    const Move topMove = m_engine.getTopMove(m_turn);
-    makeMove(topMove);
-}
-
 void GameState::handleClick(int square) {
     for(const Move move : m_currLegalMoves) {
         if(m_selectedSquare == move.getFrom() && square == move.getTo()) {
@@ -183,37 +178,28 @@ void GameState::handleClick(int square) {
     m_selectedSquare = square;
 } 
 
-void GameState::loadPosition(std::string FEN) {
+void GameState::loadPosition(std::string fen) {
     m_boardStack.clear();
     m_boardStack.emplace_back();
-    m_turn = m_boardStack.back().loadPosition(FEN);
+    m_turn = m_boardStack.back().loadPosition(fen);
     updateBoard();
 
     m_numLegalMoves = m_moveGen.getLegalMoves(m_turn, m_currLegalMoves);
 }
 
-void appendPieces(std::vector<Piece>& pieceList, std::array<uint16_t, NUM_SQUARES>& indBuf, uint16_t numPieces, const Board::PieceColor& color, const Board::PieceType& type) {
-    for(int i = 0; i < numPieces; ++i) {
-        int ind = indBuf[i];
-        int row = ind / ROW_LEN, col = ind % ROW_LEN;
-        pieceList.emplace_back(color, type, row, col);
+void GameState::moveFromList(std::vector<std::string>& moveList) {
+    for(int i = 0; i < moveList.size(); ++i) {
+        std::string moveStr = moveList[i];
+        uint16_t from = Board::getIndexSquare(moveStr.substr(0, 2));
+        uint16_t to = Board::getIndexSquare(moveStr.substr(2, 2));
+
+        for(int j = 0; j < m_numLegalMoves; ++j) {
+            Move curr = m_currLegalMoves[j];
+            if(curr.getFrom() == from && curr.getTo() == to) {
+                makeMove(curr);
+                updateLegalMoves();
+                break;
+            }    
+        } 
     }
-}
-
-std::vector<Piece> GameState::getPieceList(Board* board) {
-    std::vector<Piece> pieceList;
-    pieceList.reserve(NUM_SQUARES);
-    std::array<uint16_t, NUM_SQUARES> indBuf;
-
-    for(int pieceColor = Board::white; pieceColor <= Board::black; ++pieceColor) {
-        for(int pieceType = Board::pawns; pieceType <= Board::king; ++pieceType) {
-            Board::PieceType type = static_cast<Board::PieceType>(pieceType);
-            Board::PieceColor color = static_cast<Board::PieceColor>(pieceColor);
-            uint16_t numPieces = Board::serializeBitboard(board->getPieceSet(type, color), indBuf);
-
-            appendPieces(pieceList, indBuf, numPieces, color, type);
-        }
-    }
-
-    return pieceList;
 }
