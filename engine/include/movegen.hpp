@@ -1,8 +1,8 @@
 #pragma once
 
-#include "Move.h"
-#include "Board.h"
-#include "Tables.h"
+#include "move.hpp"
+#include "board.hpp"
+#include "tables.hpp"
 #include <vector> 
 
 class MoveGen {

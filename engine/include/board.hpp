@@ -7,7 +7,7 @@
 #include <bit>
 #include <bitset>
 #include "stdint.h"
-#include "Move.h"
+#include "move.hpp"
 
 /*
 Board class encapsulating piece bitboards using little endian rank file mappings
@@ -125,7 +125,7 @@ public:
     void updateOccupiedBB(uint64_t BB) { m_occupiedBB = BB; }
     void updateEmptyBB(uint64_t BB) { m_emptyBB = BB; }
     void clearPosition();
-    PieceColor loadPosition(std::string pos);
+    PieceColor loadPosition(std::string& fen);
 
     static uint64_t getRayMoves(uint16_t ind, Directions dir);
     static uint64_t knightAttackTargets(uint64_t BB);
@@ -187,8 +187,10 @@ public:
     static uint16_t bitScanReverse(uint64_t BB) { assert(BB != 0); return 63 - std::countl_zero(BB); }
     static uint16_t serializeSingleBit(uint64_t BB) { return bitScanForward(BB); } //get square indices from bitboards
     static uint16_t serializeBitboard(uint64_t BB, std::array<uint16_t, NUM_SQUARES>& indBuf); //serialize into indBuf and return size
+    static int materialBalance(Board* board); //positive for white material advantage, negative for black material advantage
 
-    static std::string getIndexSquare(uint16_t index);
+    static uint16_t getIndexSquare(std::string square);
+    static std::string getIndexStr(uint16_t index);
     static std::string getMoveString(Move move);
     static void printBitBoard(uint64_t BB);
 };
