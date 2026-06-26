@@ -1,12 +1,9 @@
 #include "gamestate.hpp"
 #include <chrono>
 
-GameState::GameState() : m_turn{Board::white}, m_moveGen{m_board, &m_tables}, m_currLegalMoves{}, 
-        m_selectedSquare{UNDEFINED_SQUARE} 
-{ 
+GameState::GameState() : m_state{State::inProgress}, m_turn{Board::white}, m_tables{}, m_moveGen{m_board, &m_tables}, m_currLegalMoves{} { 
     m_boardStack.reserve(INIT_STACK_SIZE);
-    m_boardStack.emplace_back();
-    updateBoard();
+    loadStartPos();
     updateLegalMoves();   
 }
 
@@ -164,19 +161,6 @@ void GameState::unMakeMove() {
         switchTurn();
     }
 }
-
-void GameState::handleClick(int square) {
-    for(const Move move : m_currLegalMoves) {
-        if(m_selectedSquare == move.getFrom() && square == move.getTo()) {
-            m_selectedSquare = UNDEFINED_SQUARE;
-            makeMove(move);
-            updateLegalMoves();
-            return;
-        }
-    }
-
-    m_selectedSquare = square;
-} 
 
 void GameState::loadPosition(std::string fen) {
     m_boardStack.clear();

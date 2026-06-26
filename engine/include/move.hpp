@@ -41,4 +41,6 @@ public:
 
     bool isCapture() const { return getFlag()&CAPTURE; }
     bool isPromotion() const { return getFlag()&0x8; }
+
+    static bool isPromotion(uint16_t flag) { return flag&0x8; }
 };

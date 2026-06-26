@@ -78,6 +78,64 @@ uint64_t Board::knightAttackTargets(uint64_t squareSet) {
     return attacks;
 }
 
+consteval std::array<int16_t, NUM_TOTAL_DIRECTIONS> genDirectionOffsetTable() {
+    constexpr std::array<int16_t, NUM_TOTAL_DIRECTIONS> directionOffsets {
+        northOffset, southOffset, eastOffset, westOffset, northEastOffset, northWestOffset, 
+        southEastOffset, southEastOffset, northNorthEastOffset, northEastEastOffset, northNorthWestOffset,
+        northWestWestOffset, southSouthEastOffset, southEastEastOffset, southSouthWestOffset, southWestWestOffset
+    };
+
+    return directionOffsets;
+}
+
+consteval std::array<Board::Directions, NUM_TOTAL_DIRECTIONS> genOppositeDirectionTable() {
+    constexpr std::array<Board::Directions, NUM_TOTAL_DIRECTIONS> oppositeDirections {
+        Board::south, Board::north, Board::west, Board::east, Board::southEast, Board::southWest,
+        Board::northEast, Board::northWest, Board::southSouthWest, Board::southWestWest, Board::southSouthEast,
+        Board::southEastEast, Board::northNorthWest, Board::northWestWest, Board::northNorthEast, Board::northEastEast,
+    };
+
+    return oppositeDirections;
+}
+
+constinit const std::array<int16_t, NUM_TOTAL_DIRECTIONS> directionOffsetTable { genDirectionOffsetTable() }; 
+constinit const std::array<Board::Directions, NUM_TOTAL_DIRECTIONS> oppositeDirectionTable { genOppositeDirectionTable() }; 
+
+int16_t Board::getDirectionOffset(Directions dir) { 
+    assert(dir >= 0 && dir <= NUM_TOTAL_DIRECTIONS);
+    return directionOffsetTable[dir];
+}
+
+int16_t Board::getDirectionOffset(int dir) { 
+    assert(dir >= 0 && dir <= NUM_TOTAL_DIRECTIONS);
+    return directionOffsetTable[dir];
+}
+
+Board::Directions Board::getOppositeDirection(Directions dir) {
+    assert(dir >= 0 && dir <= NUM_TOTAL_DIRECTIONS);
+    return oppositeDirectionTable[dir];
+}
+
+Board::Directions Board::getOppositeDirection(int dir) {
+    assert(dir >= 0 && dir <= NUM_TOTAL_DIRECTIONS);
+    return oppositeDirectionTable[dir];
+}
+
+bool Board::isNegative(Directions dir) {
+    return directionOffsetTable[dir] < 0;
+}
+
+constinit const std::array<Board::Directions, 2> pawnDirTable { Board::north, Board::south };
+
+Board::Directions Board::getPawnDirection(PieceColor color) {
+    return pawnDirTable[color];
+}
+
+uint64_t Board::pawnShift(uint64_t BB, Directions dir) {
+    uint64_t negDirMask = 0ULL - static_cast<uint64_t>(isNegative(dir));
+    return (BB << directionOffsetTable[dir] & ~negDirMask) | (BB >> -directionOffsetTable[dir] & negDirMask);
+}
+
 void initRankAttacks(std::array<std::array<uint64_t, NUM_SQUARES>, NUM_SLIDER_DIRECTIONS>& rayAttackTable) {
     uint64_t east = 0x00000000000000FEULL, nextRank = RANK_1;
     for(int sq = 0; sq < NUM_SQUARES; ++sq, east <<= 1) {
@@ -152,32 +210,6 @@ uint64_t Board::getRayMoves(uint16_t ind, Directions dir) {
     assert(ind >= 0 && ind < NUM_SQUARES);
     return rayAttackTable[dir][ind]; 
 } 
-
-Board::Board() {
-    m_pieceBB[white][all] = RANK_1 | RANK_2;
-    m_pieceBB[black][all] = RANK_7 | RANK_8;
-    m_pieceBB[white][pawns] = RANK_2; 
-    m_pieceBB[black][pawns] = RANK_7;
-    m_pieceBB[white][knights] = WHITE_KNIGHTS; 
-    m_pieceBB[black][knights] = BLACK_KNIGHTS; 
-    m_pieceBB[white][bishops] = WHITE_BISHOPS; 
-    m_pieceBB[black][bishops] = BLACK_BISHOPS; 
-    m_pieceBB[white][rooks] = WHITE_ROOKS; 
-    m_pieceBB[black][rooks] = BLACK_ROOKS; 
-    m_pieceBB[white][queens] = WHITE_QUEENS; 
-    m_pieceBB[black][queens] = BLACK_QUEENS; 
-    m_pieceBB[white][king] = WHITE_KING; 
-    m_pieceBB[black][king] = BLACK_KING; 
-
-    m_occupiedBB = m_pieceBB[white][all] | m_pieceBB[black][all];
-    m_emptyBB = ~m_occupiedBB;
-    m_enPassantTargets[white] = EMPTY;
-    m_enPassantTargets[black] = EMPTY;
-    m_kingCastleRights[white] = true;
-    m_kingCastleRights[black] = true;
-    m_queenCastleRights[white] = true;
-    m_queenCastleRights[black] = true;
-}
 
 uint64_t Board::northFill(uint64_t sliders, uint64_t empty) {
     sliders |= empty & (sliders << 8);
@@ -312,8 +344,8 @@ void Board::clearPosition() {
 
 Board::PieceColor Board::loadPosition(std::string& fen) {
     std::istringstream is(fen);
-    std::string pos, side, castleRights, epTarget, moveClock, halfMoveClock;
-    is >> pos >> side >> castleRights >> epTarget >> moveClock >> halfMoveClock;
+    std::string pos, side, castleRights, epTarget, halfMoveClock, fullMoveCounter;
+    is >> pos >> side >> castleRights >> epTarget >> halfMoveClock >> fullMoveCounter;
     PieceColor turn = side == "w" ? white : black;
 
     std::unordered_map<char, PieceType> typeMap {
@@ -358,12 +390,16 @@ Board::PieceColor Board::loadPosition(std::string& fen) {
         else m_queenCastleRights[color] = true;
     }
 
+    m_enPassantTargets[white] = EMPTY, m_enPassantTargets[black] = EMPTY;
     if(epTarget != "-") {
         int file = epTarget[0] - 96, rank = epTarget[1] - '0';
         uint16_t index = 8 * (rank-1) + file-1;
         
         updateEnPassantTargets(turn, 1ULL<<index);
     }
+
+    m_halfMoveClock = std::stoi(halfMoveClock);
+    m_fullMoveCounter = std::stoi(fullMoveCounter);
 
     return turn;
 }

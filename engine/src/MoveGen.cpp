@@ -110,10 +110,19 @@ void appendPawnMoves(std::array<uint64_t, NUM_TOTAL_DIRECTIONS>& moveTargets, st
    promoMoveTargets[Board::west] = (northWestTargets | southWestTargets) & LAST_RANK;
 }
 
+template <uint16_t flag>
+void appendMove(std::array<Move, MAX_LEGAL_MOVES>& moveBuf, int index, Move move) {
+   if constexpr (Move::isPromotion(flag)) {
+
+   } else {
+      moveBuf[index] = move;
+   }
+}
+
 void appendKingMoves(std::array<uint64_t, NUM_TOTAL_DIRECTIONS>& moveTargets, uint64_t pieces, uint64_t king, uint64_t rooks, uint64_t oppAnyAttacks,
-      uint64_t nullIfCheck, bool kingCastleRights, bool queenCastleRights, uint64_t occupied, uint64_t empty) 
+      uint64_t nullIfCheck, uint64_t drawMask, bool kingCastleRights, bool queenCastleRights, uint64_t occupied, uint64_t empty) 
 {
-   uint64_t targetMask = ~(pieces | oppAnyAttacks);
+   uint64_t targetMask = ~(pieces | oppAnyAttacks) & drawMask;
    moveTargets[Board::north] |= Board::shiftNorth(king) & targetMask;
    moveTargets[Board::south] |= Board::shiftSouth(king) & targetMask;
    moveTargets[Board::east] |= Board::shiftEast(king) & targetMask;
@@ -301,7 +310,8 @@ uint16_t MoveGen::getLegalMoves(Board::PieceColor color, std::array<Move, MAX_LE
    int64_t nullIfCheck = Board::nullBoolMask(oppAnyAttacks & king);
    int64_t nullIfDoubleCheck = Board::nullBoolMask(checkFrom & (checkFrom - 1));
    uint64_t checkTo = checkFrom | blocks | nullIfCheck;
-   uint64_t checkMask = ~pieces & checkTo & nullIfDoubleCheck;
+   uint64_t drawMask = Board::fullBoolMask(m_board->getHalfMoveClock() < 100);
+   uint64_t checkMask = ~pieces & checkTo & nullIfDoubleCheck & drawMask;
    uint64_t pawnCheckMask = checkMask | (epTarget & Board::pawnShift(checkFrom, pawnDir));
 
    appendHorSliderMoves(moveTargets, horInBetween, allInBetween, rookLike, empty, checkMask); //queen + rook
@@ -310,7 +320,7 @@ uint16_t MoveGen::getLegalMoves(Board::PieceColor color, std::array<Move, MAX_LE
    appendAntiSliderMoves(moveTargets, antiInBetween, allInBetween, bishopLike, empty, checkMask); //queen + bishop
    appendKnightMoves(moveTargets, knights, allInBetween, checkMask);
    appendPawnMoves(moveTargets, promoMoveTargets, pawns, pawnDir, oppPieces, epTarget, verInBetween, diagInBetween, antiInBetween, allInBetween, empty, pawnCheckMask, color);
-   appendKingMoves(moveTargets, pieces, king, rooks, oppAnyAttacks, nullIfCheck, m_board->getKingCastleRights(color), m_board->getQueenCastleRights(color), occupied, empty);
+   appendKingMoves(moveTargets, pieces, king, rooks, oppAnyAttacks, nullIfCheck, drawMask, m_board->getKingCastleRights(color), m_board->getQueenCastleRights(color), occupied, empty);
 
    return serializeMoves(moveBuf, moveTargets, promoMoveTargets, pawns, pawnDir, king, oppPieces, epTarget, m_board->getOccupied());
 }

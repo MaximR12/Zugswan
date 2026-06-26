@@ -6,25 +6,26 @@
 #include "movegen.hpp"
 #include "move.hpp"
 
-constexpr char START_FEN[] = "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1";
-
 constexpr int UNDEFINED_SQUARE = 65;
 constexpr int INIT_STACK_SIZE = 256;
 
+enum class State {
+    draw, whiteMate, blackMate, inProgress
+};
+
 class GameState {
 private:
-    Board::PieceColor m_turn;
     std::vector<Board> m_boardStack;
     Board* m_board;
+
+    Board::PieceColor m_turn;
+    State m_state;
 
     Tables m_tables;
     MoveGen m_moveGen;
 
     uint16_t m_numLegalMoves;
     std::array<Move, MAX_LEGAL_MOVES> m_currLegalMoves;
-    std::vector<Move> m_moveList;
-
-    uint16_t m_selectedSquare;
     
 public:
     GameState();
@@ -34,9 +35,6 @@ public:
 
     void switchTurn() { m_turn = Board::getOppositeColor(m_turn); }
     const Board::PieceColor getTurn() const { return m_turn; }
-    
-    void handleClick(int square);
-    uint16_t getSelected() const { return m_selectedSquare; } 
 
     void loadPosition(std::string fen);
     void loadStartPos() { loadPosition(START_FEN); }
@@ -44,6 +42,8 @@ public:
 
     void updateBoard() { m_board = &m_boardStack.back(); m_moveGen.updateBoard(m_board); }
     Board* getBoard() { return m_board; }
+    State getState() { return m_state; }
+    State determineEndState(); //calculate end state assuming there are no legal moves
 
     void updateLegalMoves() { m_numLegalMoves = m_moveGen.getLegalMoves(m_turn, m_currLegalMoves); }
     uint16_t getLegalMoves(std::array<Move, MAX_LEGAL_MOVES>& moveBuf) const { return m_moveGen.getLegalMoves(m_turn, moveBuf); };

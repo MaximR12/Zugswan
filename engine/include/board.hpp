@@ -22,6 +22,8 @@ Board class encapsulating piece bitboards using little endian rank file mappings
 1  7  6  5  4  3  2  1  0   
 */
 
+constexpr char START_FEN[] = "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1";
+
 constexpr uint64_t UNIVERSE = 0xFFFFFFFFFFFFFFFFULL;
 constexpr uint64_t EMPTY = 0x0000000000000000ULL;
 
@@ -89,6 +91,8 @@ private:
     std::array<bool, 2> m_queenCastleRights;
     uint64_t m_emptyBB;
     uint64_t m_occupiedBB;
+    uint16_t m_halfMoveClock;
+    uint16_t m_fullMoveCounter;
 
 public:
     enum PieceColor {
@@ -106,7 +110,7 @@ public:
         southSouthEast, southEastEast, southSouthWest, southWestWest
     };
 
-    Board();
+    Board() { }
 
     uint64_t getPieceSet(PieceType type, PieceColor color) const { return m_pieceBB[color][type]; }
     uint64_t getEnPassantTargets(PieceColor color) const { return m_enPassantTargets[color]; }
@@ -114,6 +118,7 @@ public:
     bool getQueenCastleRights(PieceColor color) const { return m_queenCastleRights[color]; }
     uint64_t getOccupied() const { return m_occupiedBB; }
     uint64_t getEmpty() const { return m_emptyBB; }
+    uint16_t getHalfMoveClock() const { return m_halfMoveClock; }
 
     PieceColor getPieceColor(uint16_t ind) const { assert(ind >= 0 && ind < NUM_SQUARES); return m_pieceBB[white][all]&(1ULL<<ind) ? white : black; }
     PieceType getPieceType(uint16_t ind) const;
@@ -125,7 +130,7 @@ public:
     void updateOccupiedBB(uint64_t BB) { m_occupiedBB = BB; }
     void updateEmptyBB(uint64_t BB) { m_emptyBB = BB; }
     void clearPosition();
-    PieceColor loadPosition(std::string& fen);
+    PieceColor loadPosition(std::string& fen); //return turn, halfmove and fullmove info for gamestate
 
     static uint64_t getRayMoves(uint16_t ind, Directions dir);
     static uint64_t knightAttackTargets(uint64_t BB);
@@ -194,61 +199,3 @@ public:
     static std::string getMoveString(Move move);
     static void printBitBoard(uint64_t BB);
 };
-
-inline consteval std::array<int16_t, NUM_TOTAL_DIRECTIONS> genDirectionOffsetTable() {
-    constexpr std::array<int16_t, NUM_TOTAL_DIRECTIONS> directionOffsets {
-        northOffset, southOffset, eastOffset, westOffset, northEastOffset, northWestOffset, 
-        southEastOffset, southEastOffset, northNorthEastOffset, northEastEastOffset, northNorthWestOffset,
-        northWestWestOffset, southSouthEastOffset, southEastEastOffset, southSouthWestOffset, southWestWestOffset
-    };
-
-    return directionOffsets;
-}
-
-inline consteval std::array<Board::Directions, NUM_TOTAL_DIRECTIONS> genOppositeDirectionTable() {
-    constexpr std::array<Board::Directions, NUM_TOTAL_DIRECTIONS> oppositeDirections {
-        Board::south, Board::north, Board::west, Board::east, Board::southEast, Board::southWest,
-        Board::northEast, Board::northWest, Board::southSouthWest, Board::southWestWest, Board::southSouthEast,
-        Board::southEastEast, Board::northNorthWest, Board::northWestWest, Board::northNorthEast, Board::northEastEast,
-    };
-
-    return oppositeDirections;
-}
-
-inline constinit const std::array<int16_t, NUM_TOTAL_DIRECTIONS> directionOffsetTable { genDirectionOffsetTable() }; 
-inline constinit const std::array<Board::Directions, NUM_TOTAL_DIRECTIONS> oppositeDirectionTable { genOppositeDirectionTable() }; 
-
-inline int16_t Board::getDirectionOffset(Directions dir) { 
-    assert(dir >= 0 && dir <= NUM_TOTAL_DIRECTIONS);
-    return directionOffsetTable[dir];
-}
-
-inline int16_t Board::getDirectionOffset(int dir) { 
-    assert(dir >= 0 && dir <= NUM_TOTAL_DIRECTIONS);
-    return directionOffsetTable[dir];
-}
-
-inline Board::Directions Board::getOppositeDirection(Directions dir) {
-    assert(dir >= 0 && dir <= NUM_TOTAL_DIRECTIONS);
-    return oppositeDirectionTable[dir];
-}
-
-inline Board::Directions Board::getOppositeDirection(int dir) {
-    assert(dir >= 0 && dir <= NUM_TOTAL_DIRECTIONS);
-    return oppositeDirectionTable[dir];
-}
-
-inline bool Board::isNegative(Directions dir) {
-    return directionOffsetTable[dir] < 0;
-}
-
-inline constinit const std::array<Board::Directions, 2> pawnDirTable { Board::north, Board::south };
-
-inline Board::Directions Board::getPawnDirection(PieceColor color) {
-    return pawnDirTable[color];
-}
-
-inline uint64_t Board::pawnShift(uint64_t BB, Directions dir) {
-    uint64_t negDirMask = 0ULL - static_cast<uint64_t>(isNegative(dir));
-    return (BB << directionOffsetTable[dir] & ~negDirMask) | (BB >> -directionOffsetTable[dir] & negDirMask);
-}
