@@ -10,8 +10,8 @@ target_sources(Engine PRIVATE
   src/engine.cpp
   src/tables.cpp
   src/search.cpp
-  src/uci.cpp
   tests/perft.cpp
+  src/uci.cpp
 )
 
 target_include_directories(Engine PUBLIC

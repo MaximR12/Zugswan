@@ -11,7 +11,7 @@ private:
 
     void go(std::istringstream& args);
     void position(std::istringstream& args);
-    void perft(GameState* stateCopy, int depth);
+    void bench(std::istringstream& args);
 
 public:
     UCI(GameState* state, Engine* engine) : m_state{state}, m_engine{engine}, m_worker{}, m_working{false} { }
