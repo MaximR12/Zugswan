@@ -4,84 +4,46 @@
 #include <sstream>
 #include <format>
 
-uint64_t Board::wpAttackTargetsEastSafe(uint64_t wPawns, uint64_t diagInBetween, uint64_t antiInBetween, uint64_t allInBetween) {
-    uint64_t pinSafe = wPawns & ~(allInBetween ^ diagInBetween); 
-    return Board::shiftNorthEast(pinSafe);
-}
-
-uint64_t Board::wpAttackTargetsWestSafe(uint64_t wPawns, uint64_t diagInBetween, uint64_t antiInBetween, uint64_t allInBetween) {
-    uint64_t pinSafe = wPawns & ~(allInBetween ^ antiInBetween);
-    return Board::shiftNorthWest(pinSafe);
-}
-
-uint64_t Board::bpAttackTargetsEastSafe(uint64_t bPawns, uint64_t diagInBetween, uint64_t antiInBetween, uint64_t allInBetween) {
-    uint64_t pinSafe = bPawns & ~(allInBetween ^ antiInBetween); 
-    return Board::shiftSouthEast(pinSafe);
-}
-
-uint64_t Board::bpAttackTargetsWestSafe(uint64_t bPawns, uint64_t diagInBetween, uint64_t antiInBetween, uint64_t allInBetween) {
-    uint64_t pinSafe = bPawns & ~(allInBetween ^ diagInBetween); 
-    return Board::shiftSouthWest(pinSafe);
-}
-
-//maps to correct safe pawn attack func given north or south pawn direction
-constinit const std::array<uint64_t (*)(uint64_t, uint64_t, uint64_t, uint64_t), 4> pawnSafeAttackFuncMap { 
-    Board::wpAttackTargetsEastSafe, Board::bpAttackTargetsEastSafe, Board::wpAttackTargetsWestSafe, Board::bpAttackTargetsWestSafe 
-};
-
-uint64_t Board::pawnAttackTargetsSafe(uint64_t pawns, PieceColor color, Directions dir, uint64_t diagInBetween, uint64_t antiInBetween, uint64_t allInBetween) { 
-    uint64_t (*func)(uint64_t, uint64_t, uint64_t, uint64_t) = pawnSafeAttackFuncMap[(dir%2)*2 + color];
-    return func(pawns, diagInBetween, antiInBetween, allInBetween);
-}
-
 uint64_t Board::whitePawnTargets(uint64_t wPawns) {
-    uint64_t westAttacks = Board::shiftNorthWest(wPawns);
-    uint64_t eastAttacks = Board::shiftNorthEast(wPawns); 
+    uint64_t westAttacks = Board::shift<Board::northWest>(wPawns);
+    uint64_t eastAttacks = Board::shift<Board::northEast>(wPawns); 
     return westAttacks | eastAttacks;
 }
 
 uint64_t Board::blackPawnTargets(uint64_t bPawns) {
-    uint64_t westAttacks = Board::shiftSouthWest(bPawns);
-    uint64_t eastAttacks = Board::shiftSouthEast(bPawns); 
+    uint64_t westAttacks = Board::shift<Board::southWest>(bPawns);
+    uint64_t eastAttacks = Board::shift<Board::southEast>(bPawns); 
     return westAttacks | eastAttacks;
 }
 
-//maps to correct pawn attack func given north or south pawn direction
-constinit const std::array<uint64_t (*)(uint64_t), 2> pawnAttackFuncMap { Board::whitePawnTargets, Board::blackPawnTargets };
-
-uint64_t Board::pawnAttackTargets(uint64_t pawns, PieceColor color) { 
-    uint64_t (*func)(uint64_t) = pawnAttackFuncMap[color];
-    return func(pawns);
-}
-
 uint64_t Board::kingAttackTargets(uint64_t squareSet) {
-    uint64_t attacks = Board::shiftEast(squareSet) | Board::shiftWest(squareSet);
+    uint64_t attacks = Board::shift<Board::east>(squareSet) | Board::shift<Board::west>(squareSet);
     squareSet |= attacks;
-    attacks |= (Board::shiftNorth(squareSet) | Board::shiftSouth(squareSet));
+    attacks |= (Board::shift<Board::north>(squareSet) | Board::shift<Board::south>(squareSet));
     return attacks;
 }
 
 uint64_t Board::knightAttackTargets(uint64_t squareSet) {
     uint64_t eastOne, eastTwo, westOne, westTwo, northOne, southOne, attacks;
-    eastOne = Board::shiftEast(squareSet);
-    westOne = Board::shiftWest(squareSet);
+    eastOne = Board::shift<Board::east>(squareSet);
+    westOne = Board::shift<Board::west>(squareSet);
 
-    northOne = Board::shiftNorth(eastOne|westOne);
-    attacks = Board::shiftNorth(northOne);
-    southOne = Board::shiftSouth(eastOne|westOne);
-    attacks |= Board::shiftSouth(southOne);
+    northOne = Board::shift<Board::north>(eastOne|westOne);
+    attacks = Board::shift<Board::north>(northOne);
+    southOne = Board::shift<Board::south>(eastOne|westOne);
+    attacks |= Board::shift<Board::south>(southOne);
 
-    eastTwo = Board::shiftEast(eastOne);
-    westTwo = Board::shiftWest(westOne);
-    attacks |= Board::shiftNorth(eastTwo|westTwo);
-    attacks |= Board::shiftSouth(eastTwo|westTwo);
+    eastTwo = Board::shift<Board::east>(eastOne);
+    westTwo = Board::shift<Board::west>(westOne);
+    attacks |= Board::shift<Board::north>(eastTwo|westTwo);
+    attacks |= Board::shift<Board::south>(eastTwo|westTwo);
     return attacks;
 }
 
 consteval std::array<int16_t, NUM_TOTAL_DIRECTIONS> genDirectionOffsetTable() {
     constexpr std::array<int16_t, NUM_TOTAL_DIRECTIONS> directionOffsets {
         northOffset, southOffset, eastOffset, westOffset, northEastOffset, northWestOffset, 
-        southEastOffset, southEastOffset, northNorthEastOffset, northEastEastOffset, northNorthWestOffset,
+        southWestOffset, southEastOffset, northNorthEastOffset, northEastEastOffset, northNorthWestOffset,
         northWestWestOffset, southSouthEastOffset, southEastEastOffset, southSouthWestOffset, southWestWestOffset
     };
 
@@ -125,17 +87,6 @@ bool Board::isNegative(Directions dir) {
     return directionOffsetTable[dir] < 0;
 }
 
-constinit const std::array<Board::Directions, 2> pawnDirTable { Board::north, Board::south };
-
-Board::Directions Board::getPawnDirection(PieceColor color) {
-    return pawnDirTable[color];
-}
-
-uint64_t Board::pawnShift(uint64_t BB, Directions dir) {
-    uint64_t negDirMask = 0ULL - static_cast<uint64_t>(isNegative(dir));
-    return (BB << directionOffsetTable[dir] & ~negDirMask) | (BB >> -directionOffsetTable[dir] & negDirMask);
-}
-
 void initRankAttacks(std::array<std::array<uint64_t, NUM_SQUARES>, NUM_SLIDER_DIRECTIONS>& rayAttackTable) {
     uint64_t east = 0x00000000000000FEULL, nextRank = RANK_1;
     for(int sq = 0; sq < NUM_SQUARES; ++sq, east <<= 1) {
@@ -164,14 +115,14 @@ void initFileAttacks(std::array<std::array<uint64_t, NUM_SQUARES>, NUM_SLIDER_DI
 
 void initDiagAttacks(std::array<std::array<uint64_t, NUM_SQUARES>, NUM_SLIDER_DIRECTIONS>& rayAttackTable) {
     uint64_t northEast = 0x8040201008040200ULL;
-    for(int file = 0; file < 8; ++file, northEast = Board::shiftEast(northEast)) {
+    for(int file = 0; file < 8; ++file, northEast = Board::shift<Board::east>(northEast)) {
         uint64_t ne = northEast;
         for(int rank = 0; rank < NUM_SQUARES; rank += 8, ne <<= 8)
             rayAttackTable[Board::northEast][rank+file] = ne;
     }
 
     uint64_t southWest = 0x0040201008040201ULL;
-    for(int file = 7; file >= 0; --file, southWest = Board::shiftWest(southWest)) {
+    for(int file = 7; file >= 0; --file, southWest = Board::shift<Board::west>(southWest)) {
         uint64_t sw = southWest;
         for(int rank = NUM_SQUARES-8; rank >= 0; rank -= 8, sw >>= 8)
             rayAttackTable[Board::southWest][rank+file] = sw;
@@ -180,14 +131,14 @@ void initDiagAttacks(std::array<std::array<uint64_t, NUM_SQUARES>, NUM_SLIDER_DI
 
 void initAntiDiagAttacks(std::array<std::array<uint64_t, NUM_SQUARES>, NUM_SLIDER_DIRECTIONS>& rayAttackTable) {
     uint64_t northWest = 0x0102040810204000ULL;
-    for(int file = 7; file >= 0; --file, northWest = Board::shiftWest(northWest)) {
+    for(int file = 7; file >= 0; --file, northWest = Board::shift<Board::west>(northWest)) {
         uint64_t nw = northWest;
         for(int rank = 0; rank < NUM_SQUARES; rank += 8, nw <<= 8)
             rayAttackTable[Board::northWest][rank+file] = nw;
     }
 
     uint64_t southEast = 0x0002040810204080ULL;
-    for(int file = 0; file < 8; ++file, southEast = Board::shiftEast(southEast)) {
+    for(int file = 0; file < 8; ++file, southEast = Board::shift<Board::east>(southEast)) {
         uint64_t se = southEast;
         for(int rank = NUM_SQUARES-8; rank >= 0; rank -= 8, se >>= 8)
             rayAttackTable[Board::southEast][rank+file] = se;
@@ -217,7 +168,7 @@ uint64_t Board::northFill(uint64_t sliders, uint64_t empty) {
     sliders |= empty & (sliders << 16);
     empty &= empty << 16;
     sliders |= empty & (sliders << 32);
-    return shiftNorth(sliders);
+    return shift<Board::north>(sliders);
 }
 
 uint64_t Board::southFill(uint64_t sliders, uint64_t empty) {
@@ -226,7 +177,7 @@ uint64_t Board::southFill(uint64_t sliders, uint64_t empty) {
     sliders |= empty & (sliders >> 16);
     empty &= empty >> 16;
     sliders |= empty & (sliders >> 32);
-    return shiftSouth(sliders);
+    return shift<Board::south>(sliders);
 }
 
 uint64_t Board::eastFill(uint64_t sliders, uint64_t empty) {
@@ -236,7 +187,7 @@ uint64_t Board::eastFill(uint64_t sliders, uint64_t empty) {
     sliders |= empty & (sliders << 2);
     empty &= empty << 2;
     sliders |= empty & (sliders << 4);
-    return shiftEast(sliders);
+    return shift<Board::east>(sliders);
 }
 
 uint64_t Board::westFill(uint64_t sliders, uint64_t empty) {
@@ -246,7 +197,7 @@ uint64_t Board::westFill(uint64_t sliders, uint64_t empty) {
     sliders |= empty & (sliders >> 2);
     empty &= empty >> 2;
     sliders |= empty & (sliders >> 4);
-    return shiftWest(sliders);
+    return shift<Board::west>(sliders);
 }
 
 uint64_t Board::northEastFill(uint64_t sliders, uint64_t empty) {
@@ -256,7 +207,7 @@ uint64_t Board::northEastFill(uint64_t sliders, uint64_t empty) {
     sliders |= empty & (sliders << 18);
     empty &= empty << 18;
     sliders |= empty & (sliders << 36);
-    return shiftNorthEast(sliders);
+    return shift<Board::northEast>(sliders);
 }
 
 uint64_t Board::northWestFill(uint64_t sliders, uint64_t empty) {
@@ -266,7 +217,7 @@ uint64_t Board::northWestFill(uint64_t sliders, uint64_t empty) {
     sliders |= empty & (sliders << 14);
     empty &= empty << 14;
     sliders |= empty & (sliders << 28);
-    return shiftNorthWest(sliders);
+    return shift<Board::northWest>(sliders);
 }
 
 uint64_t Board::southEastFill(uint64_t sliders, uint64_t empty) {
@@ -276,7 +227,7 @@ uint64_t Board::southEastFill(uint64_t sliders, uint64_t empty) {
     sliders |= empty & (sliders >> 14);
     empty &= empty >> 14;
     sliders |= empty & (sliders >> 28);
-    return shiftSouthEast(sliders);
+    return shift<Board::southEast>(sliders);
 }
 
 uint64_t Board::southWestFill(uint64_t sliders, uint64_t empty) {
@@ -286,7 +237,7 @@ uint64_t Board::southWestFill(uint64_t sliders, uint64_t empty) {
     sliders |= empty & (sliders >> 18);
     empty &= empty >> 18;
     sliders |= empty & (sliders >> 36);
-    return shiftSouthWest(sliders);
+    return shift<Board::southWest>(sliders);
 }
 
 Board::PieceType Board::getPieceType(uint16_t ind) const {

@@ -1,7 +1,7 @@
 #include "gamestate.hpp"
 #include <chrono>
 
-GameState::GameState() : m_state{State::inProgress}, m_turn{Board::white}, m_tables{}, m_moveGen{m_board, &m_tables}, m_currLegalMoves{} { 
+GameState::GameState() : m_state{State::inProgress}, m_turn{Board::white}, m_tables{}, m_moveGen{m_board, &m_tables}, m_legalMoves{} { 
     m_boardStack.reserve(INIT_STACK_SIZE);
     loadStartPos();
     updateLegalMoves();   
@@ -66,8 +66,15 @@ void GameState::makeMove(Move move) {
         case DOUBLE_PAWN_PUSH:
         {
             //horizontal pin test of possible capturing pawns
-            uint64_t epTarget = Board::pawnShift(toBB, Board::getPawnDirection(oppColor));
-            uint64_t epCapturers = m_board->pawnAttackTargets(epTarget, fromColor) & m_board->getPieceSet(Board::pawns, oppColor);
+            uint64_t epTarget, epCapturers;
+            if(m_turn == Board::white) {
+                epTarget = Board::shift<Board::south>(toBB);
+                epCapturers = m_board->whitePawnTargets(epTarget) & m_board->getPieceSet(Board::pawns, Board::black);
+            } else {
+                epTarget = Board::shift<Board::north>(toBB);
+                epCapturers = m_board->blackPawnTargets(epTarget) & m_board->getPieceSet(Board::pawns, Board::white);
+            }
+
             uint64_t empty = m_board->getEmpty();
             uint64_t emptyBeforeMove = empty | toBB; //hor pin test needs to happen before double pawn push move
 
@@ -106,7 +113,11 @@ void GameState::makeMove(Move move) {
 
         case EP_CAPTURE:
         {
-            uint64_t captureSquare = Board::pawnShift(toBB, Board::getPawnDirection(oppColor));
+            uint64_t captureSquare;
+            if(m_turn == Board::white)
+                captureSquare = Board::shift<Board::south>(toBB);
+            else
+                captureSquare = Board::shift<Board::north>(toBB);
             Board::PieceType captureType = m_board->getPieceType(Board::serializeSingleBit(captureSquare));
             uint64_t captureTypeBB = m_board->getPieceSet(captureType, oppColor);
 
@@ -167,8 +178,7 @@ void GameState::loadPosition(std::string fen) {
     m_boardStack.emplace_back();
     m_turn = m_boardStack.back().loadPosition(fen);
     updateBoard();
-
-    m_numLegalMoves = m_moveGen.getLegalMoves(m_turn, m_currLegalMoves);
+    m_moveGen.getLegalMoves(m_turn, m_legalMoves);
 }
 
 void GameState::moveFromList(std::vector<std::string>& moveList) {
@@ -177,8 +187,8 @@ void GameState::moveFromList(std::vector<std::string>& moveList) {
         uint16_t from = Board::getIndexSquare(moveStr.substr(0, 2));
         uint16_t to = Board::getIndexSquare(moveStr.substr(2, 2));
 
-        for(int j = 0; j < m_numLegalMoves; ++j) {
-            Move curr = m_currLegalMoves[j];
+        for(int j = 0; j < m_legalMoves.size(); ++j) {
+            Move curr = m_legalMoves[j];
             if(curr.getFrom() == from && curr.getTo() == to) {
                 makeMove(curr);
                 updateLegalMoves();

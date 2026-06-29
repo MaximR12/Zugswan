@@ -1,6 +1,7 @@
 #pragma once
 
 #include <array>
+#include <cassert>
 
 template<typename T, size_t N>
 class FixedVector {
@@ -15,6 +16,6 @@ public:
     T* begin() const { return m_data.data(); }
     T* end() const { return m_data.data() + size; }
 
-    void push_back(T elem) { assert(m_size < N); m_data[m_size++] = elem; }
+    void push_back(const T& elem) { assert(m_size < N); m_data[m_size++] = elem; }
     T& operator[](size_t i) { assert(i < m_size); return m_data[i]; }
 };

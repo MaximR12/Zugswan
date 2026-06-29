@@ -36,8 +36,6 @@ constexpr uint64_t RANK_6 = 0x0000FF0000000000ULL;
 constexpr uint64_t RANK_7 = 0x00FF000000000000ULL;
 constexpr uint64_t RANK_8 = 0xFF00000000000000ULL;
 
-constexpr uint64_t PAWN_RANK = RANK_2 | RANK_7;
-
 constexpr uint64_t NOT_A_FILE = 0xFEFEFEFEFEFEFEFEULL; 
 constexpr uint64_t NOT_AB_FILE = 0xFCFCFCFCFCFCFCFCULL; 
 constexpr uint64_t NOT_H_FILE = 0x7F7F7F7F7F7F7F7FULL;
@@ -81,6 +79,7 @@ constexpr int NUM_TOTAL_DIRECTIONS = 16; //slider + knight directions
 constexpr int NUM_SLIDER_DIRECTIONS = 8;
 constexpr int NUM_KNIGHT_DIRECTIONS = 8;
 constexpr int NUM_ORTHOGONAL_DIRECTIONS = 4;
+constexpr int NUM_MASK_TYPES = 10;
 constexpr int ROW_LEN = 8;
 
 class Board {
@@ -110,10 +109,15 @@ public:
         southSouthEast, southEastEast, southSouthWest, southWestWest
     };
 
+    //mask types used in move generation
+    enum MaskTypes { 
+        allPin, verPin, horPin, diagPin, antiPin, checkMask, pawnCheckMask, drawMask, kingMask, notInCheck
+    };
+
     Board() { }
 
     uint64_t getPieceSet(PieceType type, PieceColor color) const { return m_pieceBB[color][type]; }
-    uint64_t getEnPassantTargets(PieceColor color) const { return m_enPassantTargets[color]; }
+    uint64_t getEnPassantTarget(PieceColor color) const { return m_enPassantTargets[color]; }
     bool getKingCastleRights(PieceColor color) const { return m_kingCastleRights[color]; }
     bool getQueenCastleRights(PieceColor color) const { return m_queenCastleRights[color]; }
     uint64_t getOccupied() const { return m_occupiedBB; }
@@ -137,37 +141,31 @@ public:
     static uint64_t kingAttackTargets(uint64_t BB);
     static uint64_t whitePawnTargets(uint64_t BB);
     static uint64_t blackPawnTargets(uint64_t BB);
-    static uint64_t pawnAttackTargets(uint64_t pawns, PieceColor color); 
-    static uint64_t wpAttackTargetsEastSafe(uint64_t BB, uint64_t diagInBetween, uint64_t antiInBetween, uint64_t allInBetween); //pin safe pawn attack targets
-    static uint64_t wpAttackTargetsWestSafe(uint64_t BB, uint64_t diagInBetween, uint64_t antiInBetween, uint64_t allInBetween);
-    static uint64_t bpAttackTargetsEastSafe(uint64_t BB, uint64_t diagInBetween, uint64_t antiInBetween, uint64_t allInBetween);
-    static uint64_t bpAttackTargetsWestSafe(uint64_t BB, uint64_t diagInBetween, uint64_t antiInBetween, uint64_t allInBetween);
-    static uint64_t pawnAttackTargetsSafe(uint64_t pawns, PieceColor color, Directions dir, uint64_t diagInBetween, uint64_t antiInBetween, uint64_t allInBetween); 
-    static uint64_t pawnShift(uint64_t BB, Directions dir);
 
     static int64_t fullBoolMask(bool cond) { return 0ULL - static_cast<uint64_t>(cond); }
     static int64_t fullBoolMask(uint64_t BB) { return 0ULL - static_cast<uint64_t>(BB != 0); }
     static int64_t nullBoolMask(uint64_t BB) { return 0ULL - static_cast<uint64_t>(BB == 0); }
 
-    //ray directions
-    static uint64_t shiftSouth(uint64_t BB) { return (BB >> 8); }
-    static uint64_t shiftNorth(uint64_t BB) { return (BB << 8); }
-    static uint64_t shiftEast(uint64_t BB) { return (BB << 1) & NOT_A_FILE; }
-    static uint64_t shiftNorthEast(uint64_t BB) { return (BB << 9) & NOT_A_FILE; }
-    static uint64_t shiftSouthEast(uint64_t BB) { return (BB >> 7) & NOT_A_FILE; }
-    static uint64_t shiftWest(uint64_t BB) { return (BB >> 1) & NOT_H_FILE; }
-    static uint64_t shiftNorthWest(uint64_t BB) { return (BB << 7) & NOT_H_FILE; }
-    static uint64_t shiftSouthWest(uint64_t BB) { return (BB >> 9) & NOT_H_FILE; }
-
-    //knight directions
-    static uint64_t shiftNorthNorthEast(uint64_t BB) { return (BB << 17) & NOT_A_FILE; }
-    static uint64_t shiftNorthEastEast(uint64_t BB) { return (BB << 10) & NOT_AB_FILE; }
-    static uint64_t shiftNorthNorthWest(uint64_t BB) { return (BB << 15) & NOT_H_FILE; }
-    static uint64_t shiftNorthWestWest(uint64_t BB) { return (BB << 6) & NOT_GH_FILE; }
-    static uint64_t shiftSouthSouthEast(uint64_t BB) { return (BB >> 15) & NOT_A_FILE; }
-    static uint64_t shiftSouthEastEast(uint64_t BB) { return (BB >> 6) & NOT_AB_FILE; }
-    static uint64_t shiftSouthSouthWest(uint64_t BB) { return (BB >> 17) & NOT_H_FILE; }
-    static uint64_t shiftSouthWestWest(uint64_t BB) { return (BB >> 10) & NOT_GH_FILE; }
+    template<Board::Directions dir>
+    static constexpr uint64_t shift(uint64_t BB) {
+        return dir == Board::south ? (BB >> 8)
+            : dir == Board::north ? (BB << 8)
+            : dir == Board::east ? (BB << 1) & NOT_A_FILE
+            : dir == Board::west ? (BB >> 1) & NOT_H_FILE
+            : dir == Board::northEast ? (BB << 9) & NOT_A_FILE
+            : dir == Board::southEast ? (BB >> 7) & NOT_A_FILE
+            : dir == Board::northWest ? (BB << 7) & NOT_H_FILE
+            : dir == Board::southWest ? (BB >> 9) & NOT_H_FILE
+            : dir == Board::northNorthEast ? (BB << 17) & NOT_A_FILE
+            : dir == Board::northEastEast ? (BB << 10) & NOT_AB_FILE
+            : dir == Board::northNorthWest ? (BB << 15) & NOT_H_FILE
+            : dir == Board::northWestWest ? (BB << 6) & NOT_GH_FILE
+            : dir == Board::southSouthEast ? (BB >> 15) & NOT_A_FILE
+            : dir == Board::southEastEast ? (BB >> 6) & NOT_AB_FILE
+            : dir == Board::southSouthWest ? (BB >> 17) & NOT_H_FILE
+            : dir == Board::southWestWest ? (BB >> 10) & NOT_GH_FILE
+            : EMPTY;
+    }   
 
     //fill each attack direction for sliders up to and including blockers
     static uint64_t northFill(uint64_t sliders, uint64_t empty);
@@ -179,7 +177,6 @@ public:
     static uint64_t southEastFill(uint64_t sliders, uint64_t empty);
     static uint64_t southWestFill(uint64_t sliders, uint64_t empty);
 
-    static Directions getPawnDirection(PieceColor color);
     static int16_t getDirectionOffset(Directions dir);
     static int16_t getDirectionOffset(int dir);
     static Directions getOppositeDirection(int dir);
