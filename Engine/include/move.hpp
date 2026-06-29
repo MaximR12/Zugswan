@@ -44,3 +44,7 @@ public:
 
     static bool isPromotion(uint16_t flag) { return flag&0x8; }
 };
+
+enum class MoveType {
+    pawn, promotion, slider, knight, king
+};

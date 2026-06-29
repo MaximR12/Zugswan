@@ -10,12 +10,12 @@ int Search::alphaBetaMax(GameState* state, int& alpha, int& beta, int depthLeft)
     if(depthLeft == 0)
         return evaluate(state);
 
-    std::array<Move, MAX_LEGAL_MOVES> legalMoves;
-    uint16_t numLegalMoves = state->getLegalMoves(legalMoves);
+    FixedVector<Move, MAX_LEGAL_MOVES> moveList;
+    state->getLegalMoves(moveList);
 
     int bestValue = INT_MIN;
-    for(int i = 0; i < numLegalMoves; ++i) {
-        state->makeMove(legalMoves[i]);
+    for(int i = 0; i < moveList.size(); ++i) {
+        state->makeMove(moveList[i]);
         int score = alphaBetaMin(state, alpha, beta, depthLeft-1);
         state->unMakeMove();
 
@@ -36,12 +36,12 @@ int Search::alphaBetaMin(GameState* state, int& alpha, int& beta, int depthLeft)
     if(depthLeft == 0)
         return -evaluate(state);
 
-    std::array<Move, MAX_LEGAL_MOVES> legalMoves;
-    uint16_t numLegalMoves = state->getLegalMoves(legalMoves);
+    FixedVector<Move, MAX_LEGAL_MOVES> moveList;
+    state->getLegalMoves(moveList);
 
     int bestValue = INT_MAX;
-    for(int i = 0; i < numLegalMoves; ++i) {
-        state->makeMove(legalMoves[i]);
+    for(int i = 0; i < moveList.size(); ++i) {
+        state->makeMove(moveList[i]);
         int score = alphaBetaMax(state, alpha, beta, depthLeft-1);
         state->unMakeMove();
 
@@ -59,14 +59,14 @@ int Search::alphaBetaMin(GameState* state, int& alpha, int& beta, int depthLeft)
 }
 
 Move Search::bestMove(GameState* state, int depth) {
-    std::array<Move, MAX_LEGAL_MOVES> legalMoves;
-    uint16_t numLegalMoves = state->getLegalMoves(legalMoves);
-    assert(numLegalMoves > 0);
+    FixedVector<Move, MAX_LEGAL_MOVES> moveList;
+    state->getLegalMoves(moveList);
+    assert(moveList.size() > 0);
 
     int bestValue = INT_MIN, bestMoveInd = 0;
-    for(int i = 1; i < numLegalMoves; ++i) {
+    for(int i = 1; i < moveList.size(); ++i) {
         int alpha = INT_MIN, beta = INT_MAX;
-        state->makeMove(legalMoves[i]);
+        state->makeMove(moveList[i]);
         int score = alphaBetaMin(state, alpha, beta, depth-1);
         state->unMakeMove();
 
@@ -76,5 +76,5 @@ Move Search::bestMove(GameState* state, int depth) {
         }
     }
 
-    return legalMoves[bestMoveInd];
+    return moveList[bestMoveInd];
 }

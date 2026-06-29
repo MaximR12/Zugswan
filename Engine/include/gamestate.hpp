@@ -24,8 +24,7 @@ private:
     Tables m_tables;
     MoveGen m_moveGen;
 
-    uint16_t m_numLegalMoves;
-    std::array<Move, MAX_LEGAL_MOVES> m_currLegalMoves;
+    FixedVector<Move, MAX_LEGAL_MOVES> m_legalMoves;
     
 public:
     GameState();
@@ -45,8 +44,8 @@ public:
     State getState() { return m_state; }
     State determineEndState(); //calculate end state assuming there are no legal moves
 
-    void updateLegalMoves() { m_numLegalMoves = m_moveGen.getLegalMoves(m_turn, m_currLegalMoves); }
-    uint16_t getLegalMoves(std::array<Move, MAX_LEGAL_MOVES>& moveBuf) const { return m_moveGen.getLegalMoves(m_turn, moveBuf); };
+    void updateLegalMoves() { m_moveGen.getLegalMoves(m_turn, m_legalMoves); }
+    void getLegalMoves(FixedVector<Move, MAX_LEGAL_MOVES>& moveList) const { return m_moveGen.getLegalMoves(m_turn, moveList); };
     
     static uint16_t getRow(uint16_t sq) { return ROW_LEN - sq / ROW_LEN; }
     static uint16_t getCol(uint16_t sq) { return sq % ROW_LEN; }
