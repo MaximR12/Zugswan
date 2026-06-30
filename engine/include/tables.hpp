@@ -3,16 +3,26 @@
 #include <array>
 #include "board.hpp"
 
-class Tables {
-private:
-    std::array<std::array<uint64_t, NUM_SQUARES>, 2> m_pawnAttackTable;
-    std::array<uint64_t, NUM_SQUARES> m_kingMoveTable;
-    std::array<uint64_t, NUM_SQUARES> m_knightMoveTable;
+constexpr size_t MAGIC_TABLE_SIZE = 107648;
 
-public:
-    Tables();
+namespace Tables {
+    inline bool initialized = false;
 
-    uint64_t getPawnSquareAttacks(uint16_t ind, Board::PieceColor color) const { assert(ind >= 0 && ind < NUM_SQUARES && color < 2); return m_pawnAttackTable[color][ind]; }
-    uint64_t getKingMoves(uint16_t ind) const { assert(ind >= 0 && ind < NUM_SQUARES); return m_kingMoveTable[ind]; }
-    uint64_t getKnightMoves(uint16_t ind) const { assert(ind >= 0 && ind < NUM_SQUARES); return m_knightMoveTable[ind]; }
-};
+    inline std::array<std::array<uint64_t, NUM_SQUARES>, 2> pawnAttackTable;
+    inline std::array<uint64_t, NUM_SQUARES> kingMoveTable;
+    inline std::array<uint64_t, NUM_SQUARES> knightMoveTable;
+
+    inline constexpr uint64_t getRayMoves(uint16_t ind, Board::Directions dir);
+
+    struct magicEntry {
+        size_t offset;
+        uint64_t occMask;
+        uint64_t magic;
+        int shift;
+    };
+
+    uint64_t bishopAttacks(uint16_t square, uint64_t occupied);
+    uint64_t rookAttacks(uint16_t square, uint64_t occupied);
+
+    void init();
+}

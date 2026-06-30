@@ -6,13 +6,13 @@
 namespace Perft {
 
 enum Mode {
-    normal, bench
+    divide, bench
 };
 
 template<Mode mode>
 void run(GameState* game, int depth);
 
-template void run<normal>(GameState*, int);
+template void run<divide>(GameState*, int);
 template void run<bench>(GameState*, int);
 
 }

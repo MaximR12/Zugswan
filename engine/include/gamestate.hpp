@@ -21,9 +21,6 @@ private:
     Board::PieceColor m_turn;
     State m_state;
 
-    Tables m_tables;
-    MoveGen m_moveGen;
-
     FixedVector<Move, MAX_LEGAL_MOVES> m_legalMoves;
     
 public:
@@ -39,13 +36,13 @@ public:
     void loadStartPos() { loadPosition(START_FEN); }
     void moveFromList(std::vector<std::string>& moveList);
 
-    void updateBoard() { m_board = &m_boardStack.back(); m_moveGen.updateBoard(m_board); }
+    void updateBoard() { m_board = &m_boardStack.back(); }
     Board* getBoard() { return m_board; }
     State getState() { return m_state; }
     State determineEndState(); //calculate end state assuming there are no legal moves
 
-    void updateLegalMoves() { m_moveGen.getLegalMoves(m_turn, m_legalMoves); }
-    void getLegalMoves(FixedVector<Move, MAX_LEGAL_MOVES>& moveList) const { return m_moveGen.getLegalMoves(m_turn, moveList); };
+    void updateLegalMoves() { MoveGen::getLegalMoves(m_board, m_turn, m_legalMoves); }
+    void getLegalMoves(FixedVector<Move, MAX_LEGAL_MOVES>& moveList) const { return MoveGen::getLegalMoves(m_board, m_turn, moveList); };
     
     static uint16_t getRow(uint16_t sq) { return ROW_LEN - sq / ROW_LEN; }
     static uint16_t getCol(uint16_t sq) { return sq % ROW_LEN; }

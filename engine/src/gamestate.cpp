@@ -1,7 +1,7 @@
 #include "gamestate.hpp"
 #include <chrono>
 
-GameState::GameState() : m_state{State::inProgress}, m_turn{Board::white}, m_tables{}, m_moveGen{m_board, &m_tables}, m_legalMoves{} { 
+GameState::GameState() : m_state{State::inProgress}, m_turn{Board::white}, m_legalMoves{} { 
     m_boardStack.reserve(INIT_STACK_SIZE);
     loadStartPos();
     updateLegalMoves();   
@@ -178,7 +178,7 @@ void GameState::loadPosition(std::string fen) {
     m_boardStack.emplace_back();
     m_turn = m_boardStack.back().loadPosition(fen);
     updateBoard();
-    m_moveGen.getLegalMoves(m_turn, m_legalMoves);
+    updateLegalMoves();
 }
 
 void GameState::moveFromList(std::vector<std::string>& moveList) {

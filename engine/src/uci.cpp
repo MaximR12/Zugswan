@@ -18,7 +18,7 @@ void UCI::go(std::istringstream& args) {
         int depth;
         args >> depth;
         m_worker = std::thread{[state = m_state, this, depth]() {
-            Perft::run<Perft::normal>(state, depth);
+            Perft::run<Perft::divide>(state, depth);
             m_working = false;
         }};
     } 
