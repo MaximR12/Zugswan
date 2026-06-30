@@ -3,33 +3,33 @@
 #include "movegen.hpp"
 
 uint64_t getPositiveRayAttacks(uint16_t square, uint64_t occupied, Board::Directions dir) {
-   uint64_t attacks = Board::getRayMoves(square, dir);
+   uint64_t attacks = Tables::getRayMoves(square, dir);
    uint64_t blocker = attacks & occupied;
    if(blocker) {
       square = Board::bitScanForward(blocker);
-      attacks ^= Board::getRayMoves(square, dir);
+      attacks ^= Tables::getRayMoves(square, dir);
    }
 
    return attacks; 
 }
 
 uint64_t getNegativeRayAttacks(uint16_t square, uint64_t occupied, Board::Directions dir) {
-   uint64_t attacks = Board::getRayMoves(square, dir);
+   uint64_t attacks = Tables::getRayMoves(square, dir);
    uint64_t blocker = attacks & occupied;
    if(blocker) {
       square = Board::bitScanReverse(blocker);
-      attacks ^= Board::getRayMoves(square, dir);
+      attacks ^= Tables::getRayMoves(square, dir);
    }
 
    return attacks; 
 }
 
 uint64_t getRayAttacks(uint16_t square, uint64_t occupied, Board::Directions dir) {
-   uint64_t attacks = Board::getRayMoves(square, dir);
+   uint64_t attacks = Tables::getRayMoves(square, dir);
    uint64_t blocker = attacks & occupied;
    if(blocker) {
       square = Board::bitScan(blocker, Board::isNegative(dir));
-      attacks ^= Board::getRayMoves(square, dir);
+      attacks ^= Tables::getRayMoves(square, dir);
    }
 
    return attacks; 
@@ -72,9 +72,6 @@ uint16_t getFlag(Board* board, uint16_t from, uint16_t to) {
 template<Board::PieceColor color, MoveType type>
 void serializeMoves(Board* board, std::array<uint64_t, NUM_TOTAL_DIRECTIONS>& moveTargets, FixedVector<Move, MAX_LEGAL_MOVES>& moveList, int direction) 
 {
-   if(!moveTargets[direction])
-      return;
-
    uint64_t occupied = board->getOccupied();
    std::array<uint16_t, NUM_SQUARES> indices;
    int len = Board::serializeBitboard(moveTargets[direction], indices);
@@ -229,7 +226,7 @@ void appendKingMoves(Board* board, FixedVector<Move, MAX_LEGAL_MOVES>& moveList,
 
 //populates mask array
 template<Board::PieceColor color>
-void generateLegalityMasks(Board* board, Tables* tables, std::array<uint64_t, NUM_MASK_TYPES>& masks) {
+void generateLegalityMasks(Board* board, std::array<uint64_t, NUM_MASK_TYPES>& masks) {
    constexpr Board::PieceColor oppColor = color == Board::white ? Board::black : Board::white;
    constexpr Board::Directions up = color == Board::white ? Board::north : Board::south;
 
@@ -286,14 +283,14 @@ void generateLegalityMasks(Board* board, Tables* tables, std::array<uint64_t, NU
       oppPawnAttacks = Board::blackPawnTargets(oppPawns);
    else 
       oppPawnAttacks = Board::whitePawnTargets(oppPawns);
-   uint64_t pawnCheckFrom = tables->getPawnSquareAttacks(kingSquare, color) & oppPawns;
+   uint64_t pawnCheckFrom = Tables::pawnAttackTable[color][kingSquare] & oppPawns;
 
    uint64_t oppAnyAttacks = oppPawnAttacks | oppSliderEast | oppSliderWest | oppSliderNorth | oppSliderSouth | oppSliderNorthEast | oppSliderSouthWest | oppSliderNorthWest 
          | oppSliderSouthEast | Board::knightAttackTargets(oppKnights) | Board::kingAttackTargets(oppKing);
 
    uint64_t blocks = allInBetween & empty;
    uint64_t checkFrom = (kingSuperOrth & oppRookLike) | (kingSuperDiag & oppBishopLike) 
-         | pawnCheckFrom | (tables->getKnightMoves(kingSquare) & oppKnights);
+         | pawnCheckFrom | (Tables::knightMoveTable[kingSquare] & oppKnights);
 
    int64_t nullIfCheck = Board::nullBoolMask(oppAnyAttacks & king);
    int64_t nullIfDoubleCheck = Board::nullBoolMask(checkFrom & (checkFrom - 1));
@@ -306,12 +303,11 @@ void generateLegalityMasks(Board* board, Tables* tables, std::array<uint64_t, NU
    masks[Board::notInCheck] = nullIfCheck;
 }
 
-//Dirgolem move generation, generate 16 move target bitboards for each direction, then serialize into move objects
 template<Board::PieceColor color>
-void generate(Board* board, Tables* tables, FixedVector<Move, MAX_LEGAL_MOVES>& moveList) {
+void generate(Board* board, FixedVector<Move, MAX_LEGAL_MOVES>& moveList) {
    std::array<uint64_t, NUM_TOTAL_DIRECTIONS> moveTargets;
    std::array<uint64_t, NUM_MASK_TYPES> masks;
-   generateLegalityMasks<color>(board, tables, masks);
+   generateLegalityMasks<color>(board, masks);
 
    appendSliderMoves<color>(board, moveList, moveTargets, masks);
    appendKnightMoves<color>(board, moveList, moveTargets, masks);
@@ -319,6 +315,7 @@ void generate(Board* board, Tables* tables, FixedVector<Move, MAX_LEGAL_MOVES>& 
    appendKingMoves<color>(board, moveList, moveTargets, masks);
 }
 
-void MoveGen::getLegalMoves(Board::PieceColor color, FixedVector<Move, MAX_LEGAL_MOVES>& moveList) const {
-   color == Board::white ? generate<Board::white>(m_board, m_tables, moveList) : generate<Board::black>(m_board, m_tables, moveList); 
+void MoveGen::getLegalMoves(Board* board, Board::PieceColor color, FixedVector<Move, MAX_LEGAL_MOVES>& moveList) {
+   assert(Tables::initialized);
+   color == Board::white ? generate<Board::white>(board, moveList) : generate<Board::black>(board, moveList); 
 }

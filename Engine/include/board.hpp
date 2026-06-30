@@ -136,7 +136,6 @@ public:
     void clearPosition();
     PieceColor loadPosition(std::string& fen); //return turn, halfmove and fullmove info for gamestate
 
-    static uint64_t getRayMoves(uint16_t ind, Directions dir);
     static uint64_t knightAttackTargets(uint64_t BB);
     static uint64_t kingAttackTargets(uint64_t BB);
     static uint64_t whitePawnTargets(uint64_t BB);

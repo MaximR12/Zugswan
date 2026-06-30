@@ -24,7 +24,7 @@ using namespace Perft;
 
 template<Mode mode>
 void Perft::run(GameState* game, int depth) {
-    if constexpr (mode == normal) {
+    if constexpr (mode == divide) {
         FixedVector<Move, MAX_LEGAL_MOVES> moveList;
         game->getLegalMoves(moveList);
         uint64_t total = 0;
