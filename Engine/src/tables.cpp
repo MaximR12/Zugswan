@@ -1,80 +1,97 @@
 #include "tables.hpp"
 #include <chrono>
 
-void initRankAttacks(std::array<std::array<uint64_t, NUM_SQUARES>, NUM_SLIDER_DIRECTIONS>& rayAttackTable) {
+void initRankAttacks(std::array<std::array<uint64_t, NUM_SQUARES>, NUM_SLIDER_DIRECTIONS>& rayAttackTable, std::array<std::array<uint64_t, NUM_SQUARES>, 4>& sliderAttackTable) {
     uint64_t east = 0x00000000000000FEULL, nextRank = RANK_1;
     for(int sq = 0; sq < NUM_SQUARES; ++sq, east <<= 1) {
         if(sq % 8 == 0) nextRank <<= 8;
         rayAttackTable[Board::east][sq] = east&~nextRank;
+        sliderAttackTable[Board::SliderRays::hor][sq] = east&~nextRank;
     }
 
     nextRank = RANK_7;
     uint64_t west = 0x7F00000000000000ULL;
     for(int sq = NUM_SQUARES-1; sq >= 0; --sq, west >>= 1) {
         rayAttackTable[Board::west][sq] = west&~nextRank;
+        sliderAttackTable[Board::SliderRays::hor][sq] |= west&~nextRank;
         if(sq % 8 == 0) nextRank >>= 8;
     }
 }
 
-void initFileAttacks(std::array<std::array<uint64_t, NUM_SQUARES>, NUM_SLIDER_DIRECTIONS>& rayAttackTable) {
+void initFileAttacks(std::array<std::array<uint64_t, NUM_SQUARES>, NUM_SLIDER_DIRECTIONS>& rayAttackTable, std::array<std::array<uint64_t, NUM_SQUARES>, 4>& sliderAttackTable) {
     uint64_t north = 0x0101010101010100ULL;
     for(int sq = 0; sq < NUM_SQUARES; ++sq, north <<= 1) { 
         rayAttackTable[Board::north][sq] = north;
+        sliderAttackTable[Board::SliderRays::ver][sq] = north;
     }
 
     uint64_t south = 0x0080808080808080ULL;
-    for(int sq = NUM_SQUARES-1; sq >= 0; --sq, south >>= 1) 
+    for(int sq = NUM_SQUARES-1; sq >= 0; --sq, south >>= 1) {
         rayAttackTable[Board::south][sq] = south;
+        sliderAttackTable[Board::SliderRays::ver][sq] |= south;
+    }
 }
 
-void initDiagAttacks(std::array<std::array<uint64_t, NUM_SQUARES>, NUM_SLIDER_DIRECTIONS>& rayAttackTable) {
+void initDiagAttacks(std::array<std::array<uint64_t, NUM_SQUARES>, NUM_SLIDER_DIRECTIONS>& rayAttackTable, std::array<std::array<uint64_t, NUM_SQUARES>, 4>& sliderAttackTable) {
     uint64_t northEast = 0x8040201008040200ULL;
     for(int file = 0; file < 8; ++file, northEast = Board::shift<Board::east>(northEast)) {
         uint64_t ne = northEast;
-        for(int rank = 0; rank < NUM_SQUARES; rank += 8, ne <<= 8)
+        for(int rank = 0; rank < NUM_SQUARES; rank += 8, ne <<= 8) {
             rayAttackTable[Board::northEast][rank+file] = ne;
+            sliderAttackTable[Board::SliderRays::diag][rank+file] = ne;
+        }
     }
 
     uint64_t southWest = 0x0040201008040201ULL;
     for(int file = 7; file >= 0; --file, southWest = Board::shift<Board::west>(southWest)) {
         uint64_t sw = southWest;
-        for(int rank = NUM_SQUARES-8; rank >= 0; rank -= 8, sw >>= 8)
+        for(int rank = NUM_SQUARES-8; rank >= 0; rank -= 8, sw >>= 8) {
             rayAttackTable[Board::southWest][rank+file] = sw;
+            sliderAttackTable[Board::SliderRays::diag][rank+file] |= sw;
+        }
     }
 }
 
-void initAntiDiagAttacks(std::array<std::array<uint64_t, NUM_SQUARES>, NUM_SLIDER_DIRECTIONS>& rayAttackTable) {
+void initAntiDiagAttacks(std::array<std::array<uint64_t, NUM_SQUARES>, NUM_SLIDER_DIRECTIONS>& rayAttackTable, std::array<std::array<uint64_t, NUM_SQUARES>, 4>& sliderAttackTable) {
     uint64_t northWest = 0x0102040810204000ULL;
     for(int file = 7; file >= 0; --file, northWest = Board::shift<Board::west>(northWest)) {
         uint64_t nw = northWest;
-        for(int rank = 0; rank < NUM_SQUARES; rank += 8, nw <<= 8)
+        for(int rank = 0; rank < NUM_SQUARES; rank += 8, nw <<= 8) {
             rayAttackTable[Board::northWest][rank+file] = nw;
+            sliderAttackTable[Board::SliderRays::anti][rank+file] = nw;
+        }
     }
 
     uint64_t southEast = 0x0002040810204080ULL;
     for(int file = 0; file < 8; ++file, southEast = Board::shift<Board::east>(southEast)) {
         uint64_t se = southEast;
-        for(int rank = NUM_SQUARES-8; rank >= 0; rank -= 8, se >>= 8)
+        for(int rank = NUM_SQUARES-8; rank >= 0; rank -= 8, se >>= 8) {
             rayAttackTable[Board::southEast][rank+file] = se;
+            sliderAttackTable[Board::SliderRays::anti][rank+file] |= se;
+        }
     }
 }
 
-auto initRayAttackTable() 
+std::array<std::array<uint64_t, NUM_SQUARES>, NUM_SLIDER_DIRECTIONS> rayAttackTable;
+std::array<std::array<uint64_t, NUM_SQUARES>, 4> sliderAttackTable; 
+
+void initRayAttackTables() 
 {
-    std::array<std::array<uint64_t, NUM_SQUARES>, NUM_SLIDER_DIRECTIONS> rayAttackTable;
-    initRankAttacks(rayAttackTable);
-    initFileAttacks(rayAttackTable);
-    initDiagAttacks(rayAttackTable);
-    initAntiDiagAttacks(rayAttackTable);
-    return rayAttackTable;
+    initRankAttacks(rayAttackTable, sliderAttackTable);
+    initFileAttacks(rayAttackTable, sliderAttackTable);
+    initDiagAttacks(rayAttackTable, sliderAttackTable);
+    initAntiDiagAttacks(rayAttackTable, sliderAttackTable);
 }
 
-const std::array<std::array<uint64_t, NUM_SQUARES>, NUM_SLIDER_DIRECTIONS> rayAttackTable {initRayAttackTable()};
-
-constexpr uint64_t Tables::getRayMoves(uint16_t ind, Board::Directions dir) {
+uint64_t Tables::getRayMoves(uint16_t ind, Board::Directions dir) {
     assert(ind >= 0 && ind < NUM_SQUARES);
     return rayAttackTable[dir][ind]; 
 } 
+
+uint64_t Tables::getSliderMoves(uint16_t ind, Board::SliderRays dir) {
+    assert(ind >= 0 && ind < NUM_SQUARES);
+    return sliderAttackTable[dir][ind];
+}
 
 void initPawnAttackTables(std::array<std::array<uint64_t, NUM_SQUARES>, 2>& pawnAttackTable) {
     uint64_t currBB = 1;
@@ -270,6 +287,7 @@ uint64_t Tables::rookAttacks(uint16_t square, uint64_t occupied) {
 }
 
 void Tables::init() {
+    initRayAttackTables();
     initPawnAttackTables(pawnAttackTable);
     initKnightMoveTable(knightMoveTable);
     initKingMoveTable(kingMoveTable);

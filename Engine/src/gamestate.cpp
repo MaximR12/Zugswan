@@ -4,7 +4,6 @@
 GameState::GameState() : m_state{State::inProgress}, m_turn{Board::white}, m_legalMoves{} { 
     m_boardStack.reserve(INIT_STACK_SIZE);
     loadStartPos();
-    updateLegalMoves();   
 }
 
 void updateCastleRights(Board* board, Board::PieceColor fromColor, uint64_t fromBB) {

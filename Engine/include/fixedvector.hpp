@@ -16,6 +16,7 @@ public:
     T* begin() const { return m_data.data(); }
     T* end() const { return m_data.data() + size; }
 
+    void clear() { m_size = 0; }
     void push_back(const T& elem) { assert(m_size < N); m_data[m_size++] = elem; }
     T& operator[](size_t i) { assert(i < m_size); return m_data[i]; }
 };

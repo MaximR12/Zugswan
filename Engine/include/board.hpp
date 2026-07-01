@@ -109,9 +109,13 @@ public:
         southSouthEast, southEastEast, southSouthWest, southWestWest
     };
 
+    enum SliderRays {
+        hor, ver, diag, anti
+    };
+
     //mask types used in move generation
     enum MaskTypes { 
-        allPin, verPin, horPin, diagPin, antiPin, checkMask, pawnCheckMask, drawMask, kingMask, notInCheck
+        pinned, verMovable, diagMovable, antiMovable, targetMask, pawnTargetMask, kingTargetMask, drawMask, notInCheck
     };
 
     Board() { }

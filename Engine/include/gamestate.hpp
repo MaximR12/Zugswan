@@ -41,7 +41,7 @@ public:
     State getState() { return m_state; }
     State determineEndState(); //calculate end state assuming there are no legal moves
 
-    void updateLegalMoves() { MoveGen::getLegalMoves(m_board, m_turn, m_legalMoves); }
+    void updateLegalMoves() { m_legalMoves.clear(); MoveGen::getLegalMoves(m_board, m_turn, m_legalMoves); }
     void getLegalMoves(FixedVector<Move, MAX_LEGAL_MOVES>& moveList) const { return MoveGen::getLegalMoves(m_board, m_turn, moveList); };
     
     static uint16_t getRow(uint16_t sq) { return ROW_LEN - sq / ROW_LEN; }
