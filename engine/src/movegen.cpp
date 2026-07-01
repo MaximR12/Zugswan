@@ -70,19 +70,20 @@ uint16_t getFlag(Board* board, uint16_t from, uint16_t to) {
 }
 
 template<Board::PieceColor color, MoveType type>
-void serializeMoves(Board* board, std::array<uint64_t, NUM_TOTAL_DIRECTIONS>& moveTargets, FixedVector<Move, MAX_LEGAL_MOVES>& moveList, int direction) 
+void serializeMoves(Board* board, FixedVector<Move, MAX_LEGAL_MOVES>& moveList, uint64_t targets, int16_t from) 
 {
+   int16_t fromOffset;
+   if constexpr (type == MoveType::pawn || type == MoveType::promotion)
+      fromOffset = from; //from acts as offset for pawn moves
+
    uint64_t occupied = board->getOccupied();
    std::array<uint16_t, NUM_SQUARES> indices;
-   int len = Board::serializeBitboard(moveTargets[direction], indices);
+   int len = Board::serializeBitboard(targets, indices);
 
    for(int i = 0; i < len; ++i) {
       uint16_t to = indices[i];
-      uint16_t from;
-      if constexpr (type != MoveType::knight) 
-         from = Board::serializeSingleBit(getRayAttacks(to, occupied, Board::getOppositeDirection(direction)) & occupied);
-      else
-         from = to + Board::getDirectionOffset(Board::getOppositeDirection(direction));
+      if constexpr (type == MoveType::pawn || type == MoveType::promotion) 
+         from = to + fromOffset; 
       uint16_t flag = getFlag<color, type>(board, from, to);
 
       if constexpr (type != MoveType::promotion)
@@ -97,136 +98,143 @@ void serializeMoves(Board* board, std::array<uint64_t, NUM_TOTAL_DIRECTIONS>& mo
 }
 
 template<Board::PieceColor color>
-void appendSliderMoves(Board* board, FixedVector<Move, MAX_LEGAL_MOVES>& moveList, std::array<uint64_t, NUM_TOTAL_DIRECTIONS>& moveTargets,
-      std::array<uint64_t, NUM_MASK_TYPES>& masks) 
+void appendSliderMoves(Board* board, FixedVector<Move, MAX_LEGAL_MOVES>& moveList, std::array<uint16_t, NUM_SQUARES>& indBuf,
+      std::array<uint64_t, NUM_MASK_TYPES>& masks, std::array<uint64_t, NUM_SQUARES>& pinMasks)
 {
-   uint64_t targetMask = masks[Board::checkMask] & masks[Board::drawMask];
-   uint64_t empty = board->getEmpty();
+   uint64_t occupied = board->getOccupied();
    uint64_t rookLike = board->getPieceSet(Board::rooks, color) | board->getPieceSet(Board::queens, color);
    uint64_t bishopLike = board->getPieceSet(Board::bishops, color) | board->getPieceSet(Board::queens, color);
 
-   uint64_t verRookLike = rookLike & masks[Board::verPin];
-   moveTargets[Board::north] = Board::northFill(verRookLike, empty) & targetMask;
-   moveTargets[Board::south] = Board::southFill(verRookLike, empty) & targetMask;
-   uint64_t horRookLike = rookLike & masks[Board::horPin];
-   moveTargets[Board::east] = Board::eastFill(horRookLike, empty) & targetMask;
-   moveTargets[Board::west] = Board::westFill(horRookLike, empty) & targetMask;
-   uint64_t diagBishopLike = bishopLike & masks[Board::diagPin];
-   moveTargets[Board::northEast] = Board::northEastFill(diagBishopLike, empty) & targetMask;
-   moveTargets[Board::southWest] = Board::southWestFill(diagBishopLike, empty) & targetMask;
-   uint64_t antiBishopLike = bishopLike & masks[Board::antiPin];
-   moveTargets[Board::northWest] = Board::northWestFill(antiBishopLike, empty) & targetMask;
-   moveTargets[Board::southEast] = Board::southEastFill(antiBishopLike, empty) & targetMask;
+   uint16_t numRookLike = Board::serializeBitboard(rookLike, indBuf);
+   for(int i = 0; i < numRookLike; ++i) {
+      uint16_t square = indBuf[i];
+      uint64_t squareBB = 1ULL<<square;
+      uint64_t psuedoLegal = Tables::rookAttacks(square, occupied);
 
-   for(int dir = 0; dir < NUM_SLIDER_DIRECTIONS; ++dir) //loop slider directions
-      if(moveTargets[dir]) serializeMoves<color, MoveType::slider>(board, moveTargets, moveList, dir); 
+      uint64_t pinMask = UNIVERSE;
+      if(squareBB & masks[Board::pinned])
+         pinMask = pinMasks[square];
+
+      uint64_t legal = psuedoLegal & pinMask & masks[Board::targetMask];
+      if(legal) serializeMoves<color, MoveType::slider>(board, moveList, legal, square);
+   }
+
+   uint16_t numBishopLike = Board::serializeBitboard(bishopLike, indBuf);
+   for(int i = 0; i < numBishopLike; ++i) {
+      uint16_t square = indBuf[i];
+      uint64_t squareBB = 1ULL<<square;
+      uint64_t psuedoLegal = Tables::bishopAttacks(square, occupied);
+
+      uint64_t pinMask = UNIVERSE;
+      if(squareBB & masks[Board::pinned])
+         pinMask = pinMasks[square];
+      
+      uint64_t legal = psuedoLegal & pinMask & masks[Board::targetMask];
+      if(legal) serializeMoves<color, MoveType::slider>(board, moveList, legal, square);
+   }
 }
 
 template<Board::PieceColor color>
-void appendKnightMoves(Board* board, FixedVector<Move, MAX_LEGAL_MOVES>& moveList, std::array<uint64_t, NUM_TOTAL_DIRECTIONS>& moveTargets,
-      std::array<uint64_t, NUM_MASK_TYPES>& masks) 
+void appendKnightMoves(Board* board, FixedVector<Move, MAX_LEGAL_MOVES>& moveList, std::array<uint16_t, NUM_SQUARES>& indBuf,
+      std::array<uint64_t, NUM_MASK_TYPES>& masks)
 {
-   uint64_t targetMask = masks[Board::checkMask] & masks[Board::drawMask];
    uint64_t knights = board->getPieceSet(Board::knights, color);
-   knights &= masks[Board::allPin];
+   knights &= ~masks[Board::pinned];
 
-   moveTargets[Board::northNorthEast] = Board::shift<Board::northNorthEast>(knights) & targetMask; 
-   moveTargets[Board::northEastEast] = Board::shift<Board::northEastEast>(knights) & targetMask;
-   moveTargets[Board::northNorthWest] = Board::shift<Board::northNorthWest>(knights) & targetMask;
-   moveTargets[Board::northWestWest] = Board::shift<Board::northWestWest>(knights) & targetMask;
-   moveTargets[Board::southSouthEast] = Board::shift<Board::southSouthEast>(knights) & targetMask; 
-   moveTargets[Board::southEastEast] = Board::shift<Board::southEastEast>(knights) & targetMask;
-   moveTargets[Board::southSouthWest] = Board::shift<Board::southSouthWest>(knights) & targetMask;
-   moveTargets[Board::southWestWest] = Board::shift<Board::southWestWest>(knights) & targetMask;
-
-   for(int dir = Board::northNorthEast; dir < NUM_TOTAL_DIRECTIONS; ++dir) //loop knight directions
-      if(moveTargets[dir]) serializeMoves<color, MoveType::knight>(board, moveTargets, moveList, dir); 
+   uint64_t numKnights = Board::serializeBitboard(knights, indBuf);
+   for(int i = 0; i < numKnights; ++i) {
+      uint16_t square = indBuf[i];
+      uint64_t psuedoLegal = Tables::knightMoveTable[square];
+      
+      uint64_t legal = psuedoLegal & masks[Board::targetMask];
+      if(legal) serializeMoves<color, MoveType::knight>(board, moveList, legal, square);
+   }
 }
 
 template<Board::PieceColor color>
-void appendPawnMoves(Board* board, FixedVector<Move, MAX_LEGAL_MOVES>& moveList, std::array<uint64_t, NUM_TOTAL_DIRECTIONS>& moveTargets,
+void appendPawnMoves(Board* board, FixedVector<Move, MAX_LEGAL_MOVES>& moveList, std::array<uint16_t, NUM_SQUARES>& indBuf,
       std::array<uint64_t, NUM_MASK_TYPES>& masks) 
 {
-   constexpr Board::MaskTypes leftDiag = color == Board::white ? Board::antiPin : Board::diagPin;
-   constexpr Board::MaskTypes rightDiag = color == Board::white ? Board::diagPin : Board::antiPin;
+   constexpr Board::PieceColor oppColor = color == Board::white ? Board::black : Board::white;
+   constexpr uint64_t pawnRank = color == Board::white ? RANK_2 : RANK_7;
+
+   constexpr Board::MaskTypes leftDiag = color == Board::white ? Board::antiMovable : Board::diagMovable;
+   constexpr Board::MaskTypes rightDiag = color == Board::white ? Board::diagMovable : Board::antiMovable;
+
    constexpr Board::Directions up = color == Board::white ? Board::north : Board::south;
    constexpr Board::Directions upRight = color == Board::white ? Board::northEast : Board::southEast;
    constexpr Board::Directions upLeft = color == Board::white ? Board::northWest : Board::southWest;
-   constexpr Board::PieceColor oppColor = color == Board::white ? Board::black : Board::white;
-   constexpr uint64_t pawnRank = color == Board::white ? RANK_2 : RANK_7;
+
+   constexpr int16_t downOffset = color == Board::white ? southOffset : northOffset;
+   constexpr int16_t downLeftOffset = color == Board::white ? southWestOffset : northWestOffset;
+   constexpr int16_t downRightOffset = color == Board::white ? southEastOffset : northEastOffset;
 
    uint64_t pawns = board->getPieceSet(Board::pawns, color);
    uint64_t oppPieces = board->getPieceSet(Board::all, oppColor);
    uint64_t epAttackTarget = board->getEnPassantTarget(color);
    uint64_t empty = board->getEmpty();
-   uint64_t targetMask = masks[Board::pawnCheckMask] & masks[Board::drawMask]; 
+   uint64_t targetMask = masks[Board::pawnTargetMask]; 
 
-   //pushes
-   uint64_t pushable = pawns & masks[Board::verPin];
+   uint64_t pushable = pawns & masks[Board::verMovable];
    uint64_t singlePushTargets = Board::shift<up>(pushable) & empty & targetMask;
-   moveTargets[up] = singlePushTargets & NOT_LAST_RANK;
    uint64_t doublePushTargets = Board::shift<up>(pushable & pawnRank) & empty;
-   moveTargets[up] |= Board::shift<up>(doublePushTargets) & empty & targetMask;
-
-   //attacks
+   doublePushTargets = Board::shift<up>(doublePushTargets) & empty & targetMask;
    uint64_t leftAttacks = Board::shift<upLeft>(pawns & masks[leftDiag]) & (oppPieces | epAttackTarget) & targetMask;
-   moveTargets[upLeft] = leftAttacks & NOT_LAST_RANK;
    uint64_t rightAttacks = Board::shift<upRight>(pawns & masks[rightDiag]) & (oppPieces | epAttackTarget) & targetMask;
-   moveTargets[upRight] = rightAttacks & NOT_LAST_RANK;
+   
+   if(singlePushTargets & NOT_LAST_RANK) serializeMoves<color, MoveType::pawn>(board, moveList, singlePushTargets & NOT_LAST_RANK, downOffset);
+   if(doublePushTargets) serializeMoves<color, MoveType::pawn>(board, moveList, doublePushTargets, downOffset*2);
+   if(rightAttacks & NOT_LAST_RANK) serializeMoves<color, MoveType::pawn>(board, moveList, rightAttacks & NOT_LAST_RANK, downLeftOffset);
+   if(leftAttacks & NOT_LAST_RANK) serializeMoves<color, MoveType::pawn>(board, moveList, leftAttacks & NOT_LAST_RANK, downRightOffset);
 
-   if(moveTargets[up]) serializeMoves<color, MoveType::pawn>(board, moveTargets, moveList, up);
-   if(moveTargets[upLeft]) serializeMoves<color, MoveType::pawn>(board, moveTargets, moveList, upLeft);
-   if(moveTargets[upRight]) serializeMoves<color, MoveType::pawn>(board, moveTargets, moveList, upRight);
-
-   //promotions
-   moveTargets[up] = singlePushTargets & LAST_RANK;
-   moveTargets[upLeft] = leftAttacks & LAST_RANK;
-   moveTargets[upRight] = rightAttacks & LAST_RANK;
-
-   if(moveTargets[up]) serializeMoves<color, MoveType::promotion>(board, moveTargets, moveList, up);
-   if(moveTargets[upLeft]) serializeMoves<color, MoveType::promotion>(board, moveTargets, moveList, upLeft);
-   if(moveTargets[upRight]) serializeMoves<color, MoveType::promotion>(board, moveTargets, moveList, upRight);
+   if(singlePushTargets & LAST_RANK) serializeMoves<color, MoveType::promotion>(board, moveList, singlePushTargets & LAST_RANK, downOffset);
+   if(rightAttacks & LAST_RANK) serializeMoves<color, MoveType::promotion>(board, moveList, rightAttacks & LAST_RANK, downLeftOffset);
+   if(leftAttacks & LAST_RANK) serializeMoves<color, MoveType::promotion>(board, moveList, leftAttacks & LAST_RANK, downRightOffset);
 }
 
 template<Board::PieceColor color>
-void appendKingMoves(Board* board, FixedVector<Move, MAX_LEGAL_MOVES>& moveList, std::array<uint64_t, NUM_TOTAL_DIRECTIONS>& moveTargets,
-      std::array<uint64_t, NUM_MASK_TYPES>& masks) 
-{
-   uint64_t targetMask = masks[Board::kingMask] & masks[Board::drawMask];
+void appendKingMoves(Board* board, FixedVector<Move, MAX_LEGAL_MOVES>& moveList, std::array<uint64_t, NUM_MASK_TYPES>& masks) {
+   uint64_t targetMask = masks[Board::kingTargetMask];
    uint64_t king = board->getPieceSet(Board::king, color);
+   uint16_t kingSquare = Board::serializeSingleBit(king);
    
-   moveTargets[Board::north] = Board::shift<Board::north>(king) & targetMask;
-   moveTargets[Board::south] = Board::shift<Board::south>(king) & targetMask;
-   moveTargets[Board::east] = Board::shift<Board::east>(king) & targetMask;
-   moveTargets[Board::west] = Board::shift<Board::west>(king) & targetMask;
-   moveTargets[Board::northEast] = Board::shift<Board::northEast>(king) & targetMask;
-   moveTargets[Board::northWest] = Board::shift<Board::northWest>(king) & targetMask;
-   moveTargets[Board::southEast] = Board::shift<Board::southEast>(king) & targetMask;
-   moveTargets[Board::southWest] = Board::shift<Board::southWest>(king) & targetMask;
+   uint64_t targets = Tables::kingMoveTable[kingSquare] & targetMask;
+   if(targets) serializeMoves<color, MoveType::king>(board, moveList, targets, kingSquare);
 
    bool kingCastleRights = board->getKingCastleRights(color);
    bool queenCastleRights = board->getQueenCastleRights(color);
+
+   if(!kingCastleRights && !queenCastleRights)
+      return;
+
    uint64_t rooks = board->getPieceSet(Board::rooks, color);
    uint64_t occupied = board->getOccupied();
    uint64_t empty = board->getEmpty();
    uint64_t notInCheck = masks[Board::notInCheck];
 
-   //castle moves
    targetMask &= empty;
    uint64_t kingCastleMask = Board::fullBoolMask(kingCastleRights), queenCastleMask = Board::fullBoolMask(queenCastleRights);
    uint64_t eastOne = Board::shift<Board::east>(king) & targetMask;
-   moveTargets[Board::east] |= Board::shift<Board::east>(eastOne) & targetMask & kingCastleMask & Board::fullBoolMask((king << 3) & rooks) & notInCheck;
+   uint64_t leftCastle = Board::shift<Board::east>(eastOne) & targetMask & kingCastleMask & Board::fullBoolMask((king << 3) & rooks) & notInCheck;
    uint64_t westOne = Board::shift<Board::west>(king) & targetMask;
    uint64_t westTwo = Board::shift<Board::west>(westOne) & targetMask;
-   moveTargets[Board::west] |= westTwo & Board::nullBoolMask(Board::shift<Board::west>(westTwo) & occupied) & queenCastleMask & Board::fullBoolMask((king >> 4) & rooks) & notInCheck; //queen castle includes occupency check of square west of queen rook
+   uint64_t rightCastle = westTwo & Board::nullBoolMask(Board::shift<Board::west>(westTwo) & occupied) & queenCastleMask & Board::fullBoolMask((king >> 4) & rooks) & notInCheck; //queen castle includes occupency check of square west of queen rook
 
-   for(int dir = 0; dir < NUM_SLIDER_DIRECTIONS; ++dir) //loop slider directions
-      if(moveTargets[dir]) serializeMoves<color, MoveType::king>(board, moveTargets, moveList, dir); 
+   uint64_t castleTargets = leftCastle | rightCastle;
+   if(castleTargets) serializeMoves<color, MoveType::king>(board, moveList, castleTargets, kingSquare);
+}
+
+void populatePinMasks(std::array<uint64_t, NUM_SQUARES>& pinMasks, std::array<uint16_t, NUM_SQUARES>& indBuf, Board::SliderRays dir, uint64_t inBetween) {
+   uint16_t num = Board::serializeBitboard(inBetween, indBuf);
+   for(int i = 0; i < num; ++i) {
+      uint16_t ind = indBuf[i];
+      pinMasks[ind] = Tables::getSliderMoves(ind, dir);
+   }
 }
 
 //populates mask array
 template<Board::PieceColor color>
-void generateLegalityMasks(Board* board, std::array<uint64_t, NUM_MASK_TYPES>& masks) {
+void generateLegalityMasks(Board* board, std::array<uint64_t, NUM_MASK_TYPES>& masks, std::array<uint64_t, NUM_SQUARES>& pinMasks, std::array<uint16_t, NUM_SQUARES>& indBuf) {
    constexpr Board::PieceColor oppColor = color == Board::white ? Board::black : Board::white;
    constexpr Board::Directions up = color == Board::white ? Board::north : Board::south;
 
@@ -261,19 +269,26 @@ void generateLegalityMasks(Board* board, std::array<uint64_t, NUM_MASK_TYPES>& m
    
    uint64_t verInBetween = oppSliderNorth & kingSouth;
    verInBetween |= oppSliderSouth & kingNorth;
+   populatePinMasks(pinMasks, indBuf, Board::ver, verInBetween);
+
    uint64_t horInBetween = oppSliderEast & kingWest;
    horInBetween |= oppSliderWest & kingEast;
+   populatePinMasks(pinMasks, indBuf, Board::hor, horInBetween);
+
    uint64_t diagInBetween = oppSliderNorthEast & kingSouthWest;
    diagInBetween |= oppSliderSouthWest & kingNorthEast;
+   populatePinMasks(pinMasks, indBuf, Board::diag, diagInBetween);
+
    uint64_t antiInBetween = oppSliderNorthWest & kingSouthEast;
    antiInBetween |= oppSliderSouthEast & kingNorthWest;
+   populatePinMasks(pinMasks, indBuf, Board::anti, antiInBetween);
+
    uint64_t allInBetween = horInBetween | verInBetween | diagInBetween | antiInBetween;
 
-   masks[Board::allPin] = ~allInBetween;
-   masks[Board::verPin] = ~(allInBetween ^ verInBetween);
-   masks[Board::horPin] = ~(allInBetween ^ horInBetween);
-   masks[Board::diagPin] = ~(allInBetween ^ diagInBetween);
-   masks[Board::antiPin] = ~(allInBetween ^ antiInBetween);
+   masks[Board::verMovable] = ~(allInBetween ^ verInBetween);
+   masks[Board::diagMovable] = ~(allInBetween ^ diagInBetween);
+   masks[Board::antiMovable] = ~(allInBetween ^ antiInBetween);
+   masks[Board::pinned] = allInBetween;
 
    uint64_t kingSuperOrth = kingNorth | kingSouth | kingEast | kingWest;
    uint64_t kingSuperDiag = kingNorthEast | kingNorthWest | kingSouthEast | kingSouthWest;
@@ -295,24 +310,25 @@ void generateLegalityMasks(Board* board, std::array<uint64_t, NUM_MASK_TYPES>& m
    int64_t nullIfCheck = Board::nullBoolMask(oppAnyAttacks & king);
    int64_t nullIfDoubleCheck = Board::nullBoolMask(checkFrom & (checkFrom - 1));
    uint64_t checkTo = checkFrom | blocks | nullIfCheck;
+   uint64_t drawMask = Board::fullBoolMask(board->getHalfMoveClock() < 100);
 
-   masks[Board::drawMask] = Board::fullBoolMask(board->getHalfMoveClock() < 100);
-   masks[Board::checkMask] = ~pieces & checkTo & nullIfDoubleCheck;
-   masks[Board::pawnCheckMask] = (masks[Board::checkMask] | (board->getEnPassantTarget(color) & Board::shift<up>(pawnCheckFrom))); //include en passant capture of pawn checker
-   masks[Board::kingMask] = ~(pieces | oppAnyAttacks);
+   masks[Board::targetMask] = ~pieces & checkTo & nullIfDoubleCheck & drawMask;
+   masks[Board::pawnTargetMask] = (masks[Board::targetMask] | (board->getEnPassantTarget(color) & Board::shift<up>(pawnCheckFrom))) & drawMask; //include en passant capture of pawn checker
+   masks[Board::kingTargetMask] = ~(pieces | oppAnyAttacks) & drawMask;
    masks[Board::notInCheck] = nullIfCheck;
 }
 
 template<Board::PieceColor color>
 void generate(Board* board, FixedVector<Move, MAX_LEGAL_MOVES>& moveList) {
-   std::array<uint64_t, NUM_TOTAL_DIRECTIONS> moveTargets;
+   std::array<uint16_t, NUM_SQUARES> indBuf;
    std::array<uint64_t, NUM_MASK_TYPES> masks;
-   generateLegalityMasks<color>(board, masks);
+   std::array<uint64_t, NUM_SQUARES> pinMasks;
+   generateLegalityMasks<color>(board, masks, pinMasks, indBuf);
 
-   appendSliderMoves<color>(board, moveList, moveTargets, masks);
-   appendKnightMoves<color>(board, moveList, moveTargets, masks);
-   appendPawnMoves<color>(board, moveList, moveTargets, masks);
-   appendKingMoves<color>(board, moveList, moveTargets, masks);
+   appendSliderMoves<color>(board, moveList, indBuf, masks, pinMasks);
+   appendKnightMoves<color>(board, moveList, indBuf, masks);
+   appendPawnMoves<color>(board, moveList, indBuf, masks);
+   appendKingMoves<color>(board, moveList, masks);
 }
 
 void MoveGen::getLegalMoves(Board* board, Board::PieceColor color, FixedVector<Move, MAX_LEGAL_MOVES>& moveList) {

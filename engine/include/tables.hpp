@@ -12,7 +12,9 @@ namespace Tables {
     inline std::array<uint64_t, NUM_SQUARES> kingMoveTable;
     inline std::array<uint64_t, NUM_SQUARES> knightMoveTable;
 
-    inline constexpr uint64_t getRayMoves(uint16_t ind, Board::Directions dir);
+    uint64_t getRayMoves(uint16_t ind, Board::Directions dir);
+
+    uint64_t getSliderMoves(uint16_t ind, Board::SliderRays dir);
 
     struct magicEntry {
         size_t offset;
