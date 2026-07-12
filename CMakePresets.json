@@ -6,9 +6,28 @@
       "generator": "Visual Studio 18 2026",
       "binaryDir": "${sourceDir}/build",
       "cacheVariables": {
-        "CMAKE_TOOLCHAIN_FILE": "C:/Users/maxro/OneDrive/Desktop/vcpkg/scripts/buildsystems/vcpkg.cmake",
-        "CMAKE_BUILD_TYPE": "Debug"
+        "CMAKE_TOOLCHAIN_FILE": "C:/Users/maxro/OneDrive/Desktop/vcpkg/scripts/buildsystems/vcpkg.cmake"
       }
+    }
+  ],
+  "buildPresets": [
+    {
+      "name": "debug",
+      "displayName": "Debug",
+      "configurePreset": "default",
+      "configuration": "Debug"
+    },
+    {
+      "name": "release",
+      "displayName": "Release",
+      "configurePreset": "default",
+      "configuration": "Release"
+    },
+    {
+      "name": "relwithdebinfo",
+      "displayName": "RelWithDebInfo",
+      "configurePreset": "default",
+      "configuration": "RelWithDebInfo"
     }
   ]
 }

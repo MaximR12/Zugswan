@@ -30,7 +30,7 @@ private:
     uint16_t m_move;
 
 public:
-    Move() { }
+    Move() = default;
     Move(uint16_t flags, uint16_t from, uint16_t to) { 
         m_move = ((flags&0xF)<<12) | ((to&0x3F)<<6) | (from&0x3F);
     }

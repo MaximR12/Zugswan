@@ -14,7 +14,7 @@ uint64_t perft(GameState* game, int depth) {
     for(size_t i = 0; i < moveList.size(); ++i) {
         game->makeMove(moveList[i]);
         nodes += perft(game, depth-1);
-        game->unMakeMove();
+        game->unMakeMove(moveList[i]);
     }
 
     return nodes;
@@ -31,7 +31,7 @@ void Perft::run(GameState* game, int depth) {
         for(size_t i = 0; i < moveList.size(); ++i) {
             game->makeMove(moveList[i]);
             uint64_t nodes = depth == 1 ? 1 : perft(game, depth-1);
-            game->unMakeMove();
+            game->unMakeMove(moveList[i]);
 
             total += nodes;
             movePaths[Board::getMoveString(moveList[i])] = nodes;

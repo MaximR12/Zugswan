@@ -10,7 +10,7 @@ private:
     size_t m_size;
 
 public:
-    FixedVector<T, N>() : m_size{0}, m_data{} { };
+    FixedVector<T, N>() : m_size{0} { };
 
     size_t size() { return m_size; }
     T& back() { return m_data[m_size-1]; }
