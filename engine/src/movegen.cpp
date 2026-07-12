@@ -234,7 +234,7 @@ void populatePinMasks(std::array<uint64_t, NUM_SQUARES>& pinMasks, std::array<ui
 
 //populates mask array
 template<Board::PieceColor color>
-void generateLegalityMasks(Board* board, std::array<uint64_t, NUM_MASK_TYPES>& masks, std::array<uint64_t, NUM_SQUARES>& pinMasks, std::array<uint16_t, NUM_SQUARES>& indBuf) {
+void generateMasks(Board* board, std::array<uint64_t, NUM_MASK_TYPES>& masks, std::array<uint64_t, NUM_SQUARES>& pinMasks, std::array<uint16_t, NUM_SQUARES>& indBuf) {
    constexpr Board::PieceColor oppColor = color == Board::white ? Board::black : Board::white;
    constexpr Board::Directions up = color == Board::white ? Board::north : Board::south;
 
@@ -323,7 +323,7 @@ void generate(Board* board, FixedVector<Move, MAX_LEGAL_MOVES>& moveList) {
    std::array<uint16_t, NUM_SQUARES> indBuf;
    std::array<uint64_t, NUM_MASK_TYPES> masks;
    std::array<uint64_t, NUM_SQUARES> pinMasks;
-   generateLegalityMasks<color>(board, masks, pinMasks, indBuf);
+   generateMasks<color>(board, masks, pinMasks, indBuf);
 
    appendSliderMoves<color>(board, moveList, indBuf, masks, pinMasks);
    appendKnightMoves<color>(board, moveList, indBuf, masks);

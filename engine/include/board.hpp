@@ -86,12 +86,12 @@ class Board {
 private:
     std::array<std::array<uint64_t, NUM_PIECE_TYPES>, 2> m_pieceBB;
     std::array<uint64_t, 2> m_enPassantTargets;
-    std::array<bool, 2> m_kingCastleRights;
-    std::array<bool, 2> m_queenCastleRights;
     uint64_t m_emptyBB;
     uint64_t m_occupiedBB;
     uint16_t m_halfMoveClock;
     uint16_t m_fullMoveCounter;
+    std::array<bool, 2> m_kingCastleRights;
+    std::array<bool, 2> m_queenCastleRights;
 
 public:
     enum PieceColor {
@@ -180,6 +180,7 @@ public:
     static uint64_t southEastFill(uint64_t sliders, uint64_t empty);
     static uint64_t southWestFill(uint64_t sliders, uint64_t empty);
 
+    static PieceType getPromoType(uint16_t flag);
     static int16_t getDirectionOffset(Directions dir);
     static int16_t getDirectionOffset(int dir);
     static Directions getOppositeDirection(int dir);
