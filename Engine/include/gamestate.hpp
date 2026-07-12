@@ -7,7 +7,7 @@
 #include "move.hpp"
 
 constexpr int UNDEFINED_SQUARE = 65;
-constexpr int INIT_STACK_SIZE = 256;
+constexpr int UNDO_STACK_SIZE = 256;
 
 enum class State {
     draw, whiteMate, blackMate, inProgress
@@ -15,7 +15,7 @@ enum class State {
 
 class GameState {
 private:
-    std::vector<Board> m_boardStack;
+    FixedVector<Board, UNDO_STACK_SIZE> m_boardStack;
     Board* m_board;
 
     Board::PieceColor m_turn;

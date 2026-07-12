@@ -20,9 +20,7 @@ uint64_t perft(GameState* game, int depth) {
     return nodes;
 }
 
-using namespace Perft;
-
-template<Mode mode>
+template<Perft::Mode mode>
 void Perft::run(GameState* game, int depth) {
     if constexpr (mode == divide) {
         FixedVector<Move, MAX_LEGAL_MOVES> moveList;
@@ -51,6 +49,7 @@ void Perft::run(GameState* game, int depth) {
         auto end = std::chrono::high_resolution_clock::now();
         double dur = std::chrono::duration<double>(end - start).count();
 
+        std::cout << "Time: " << dur << "s\n";
         std::cout << "Nodes searched: " << nodes << '\n'; 
         std::cout << "Nodes per second: " << static_cast<int>(nodes / dur) << '\n';
     }

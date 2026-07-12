@@ -2,7 +2,6 @@
 #include <chrono>
 
 GameState::GameState() : m_state{State::inProgress}, m_turn{Board::white}, m_legalMoves{} { 
-    m_boardStack.reserve(INIT_STACK_SIZE);
     loadStartPos();
 }
 
@@ -32,7 +31,7 @@ void removePiece(Board* board, Board::PieceType type, Board::PieceColor color, u
 }
 
 void GameState::makeMove(Move move) {
-    m_boardStack.emplace_back(*m_board);
+    m_boardStack.push_back(*m_board);
     updateBoard();
 
     uint16_t fromInd = move.getFrom(), toInd = move.getTo();
@@ -43,8 +42,6 @@ void GameState::makeMove(Move move) {
     Board::PieceColor fromColor = m_board->getPieceColor(fromInd);
     Board::PieceColor oppColor = Board::getOppositeColor(fromColor);
     Board::PieceType fromType = m_board->getPieceType(fromInd);
-    uint64_t fromColorBB = m_board->getPieceSet(Board::all, fromColor);
-    uint64_t fromTypeBB = m_board->getPieceSet(fromType, fromColor);
 
     updateCastleRights(m_board, fromColor, fromBB);
     m_board->updateEnPassantTargets(oppColor, 0ULL);
@@ -59,12 +56,9 @@ void GameState::makeMove(Move move) {
         removePiece(m_board, captureType, oppColor, toBB);
         updateOccupied(m_board, m_board->getOccupied() ^ fromBB);
     }
-    
-    if(flag != EP_CAPTURE) flag &= ~CAPTURE; //consider promotions and promo captures in the same case
-    switch(flag) {
-        case DOUBLE_PAWN_PUSH:
-        {
-            //horizontal pin test of possible capturing pawns
+
+    if(fromType == Board::pawns) {
+        if(flag == DOUBLE_PAWN_PUSH) {
             uint64_t epTarget, epCapturers;
             if(m_turn == Board::white) {
                 epTarget = Board::shift<Board::south>(toBB);
@@ -85,33 +79,7 @@ void GameState::makeMove(Move move) {
             uint64_t horPinnedMask = Board::nullBoolMask(horInBetween & epCapturers);
 
             m_board->updateEnPassantTargets(oppColor, epTarget & horPinnedMask);
-            break;
-        }
-
-        case KING_CASTLE:
-        {
-            uint64_t rooks = m_board->getPieceSet(Board::rooks, fromColor);
-            uint64_t kingRook = fromBB << 3;
-            uint64_t rookFromToBB = kingRook | (kingRook >> 2);
-
-            movePiece(m_board, Board::rooks, fromColor, rookFromToBB);
-            updateOccupied(m_board, m_board->getOccupied() ^ rookFromToBB);
-            break;
-        }
-
-        case QUEEN_CASTLE:
-        {
-            uint64_t rooks = m_board->getPieceSet(Board::rooks, fromColor);
-            uint64_t queenRook = fromBB >> 4;
-            uint64_t rookFromToBB = queenRook | (queenRook << 3);
-
-            movePiece(m_board, Board::rooks, fromColor, rookFromToBB);
-            updateOccupied(m_board, m_board->getOccupied() ^ rookFromToBB);   
-            break;
-        }
-
-        case EP_CAPTURE:
-        {
+        } else if(flag == EP_CAPTURE) {
             uint64_t captureSquare;
             if(m_turn == Board::white)
                 captureSquare = Board::shift<Board::south>(toBB);
@@ -122,44 +90,27 @@ void GameState::makeMove(Move move) {
 
             removePiece(m_board, captureType, oppColor, captureSquare);
             updateOccupied(m_board, m_board->getOccupied() ^ captureSquare);
-            break;
+        } else if(Move::isPromotion(flag)) {
+            Board::PieceType promoType = Board::getPromoType(flag);
+            m_board->updateBB(Board::pawns, fromColor, m_board->getPieceSet(Board::pawns, fromColor) & NOT_LAST_RANK);
+            uint64_t promoSet = m_board->getPieceSet(promoType, fromColor);
+            m_board->updateBB(promoType, fromColor, promoSet | toBB);
         }
+    } else if(flag == KING_CASTLE) {
+        uint64_t rooks = m_board->getPieceSet(Board::rooks, fromColor);
+        uint64_t kingRook = fromBB << 3;
+        uint64_t rookFromToBB = kingRook | (kingRook >> 2);
 
-        case KNIGHT_PROMOTION:
-        {
-            m_board->updateBB(Board::pawns, fromColor, m_board->getPieceSet(Board::pawns, fromColor) & NOT_LAST_RANK);
-            uint64_t knightSet = m_board->getPieceSet(Board::knights, fromColor);
-            m_board->updateBB(Board::knights, fromColor, knightSet | toBB);
-            break;
-        }
-            
-        case BISHOP_PROMOTION:
-        {
-            m_board->updateBB(Board::pawns, fromColor, m_board->getPieceSet(Board::pawns, fromColor) & NOT_LAST_RANK);
-            uint64_t bishopSet = m_board->getPieceSet(Board::bishops, fromColor);
-            m_board->updateBB(Board::bishops, fromColor, bishopSet | toBB);
-            break;
-        }
-            
-        case ROOK_PROMOTION:
-        {
-            m_board->updateBB(Board::pawns, fromColor, m_board->getPieceSet(Board::pawns, fromColor) & NOT_LAST_RANK);
-            uint64_t rookSet = m_board->getPieceSet(Board::rooks, fromColor);
-            m_board->updateBB(Board::rooks, fromColor, rookSet | toBB);
-            break;
-        }
-            
-        case QUEEN_PROMOTION:
-        {
-            m_board->updateBB(Board::pawns, fromColor, m_board->getPieceSet(Board::pawns, fromColor) & NOT_LAST_RANK);
-            uint64_t queenSet = m_board->getPieceSet(Board::queens, fromColor);
-            m_board->updateBB(Board::queens, fromColor, queenSet | toBB);
-            break;
-        }
+        movePiece(m_board, Board::rooks, fromColor, rookFromToBB);
+        updateOccupied(m_board, m_board->getOccupied() ^ rookFromToBB);
+    } else if(flag == QUEEN_CASTLE) {
+        uint64_t rooks = m_board->getPieceSet(Board::rooks, fromColor);
+        uint64_t queenRook = fromBB >> 4;
+        uint64_t rookFromToBB = queenRook | (queenRook << 3);
 
-        default:
-            break;
-    }    
+        movePiece(m_board, Board::rooks, fromColor, rookFromToBB);
+        updateOccupied(m_board, m_board->getOccupied() ^ rookFromToBB); 
+    }
 
     switchTurn();
 }
@@ -174,7 +125,7 @@ void GameState::unMakeMove() {
 
 void GameState::loadPosition(std::string fen) {
     m_boardStack.clear();
-    m_boardStack.emplace_back();
+    m_boardStack.push_back();
     m_turn = m_boardStack.back().loadPosition(fen);
     updateBoard();
     updateLegalMoves();

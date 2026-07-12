@@ -40,28 +40,19 @@ uint64_t Board::knightAttackTargets(uint64_t squareSet) {
     return attacks;
 }
 
-consteval std::array<int16_t, NUM_TOTAL_DIRECTIONS> genDirectionOffsetTable() {
-    constexpr std::array<int16_t, NUM_TOTAL_DIRECTIONS> directionOffsets {
-        northOffset, southOffset, eastOffset, westOffset, northEastOffset, northWestOffset, 
-        southWestOffset, southEastOffset, northNorthEastOffset, northEastEastOffset, northNorthWestOffset,
-        northWestWestOffset, southSouthEastOffset, southEastEastOffset, southSouthWestOffset, southWestWestOffset
-    };
+constinit const std::array<Board::PieceType, 4> promoTypeTable {
+    Board::knights, Board::bishops, Board::rooks, Board::queens
+};
 
-    return directionOffsets;
+Board::PieceType Board::getPromoType(uint16_t flag) {
+    assert(Move::isPromotion(flag)); return promoTypeTable[flag & ~(CAPTURE | 0x8)];
 }
 
-consteval std::array<Board::Directions, NUM_TOTAL_DIRECTIONS> genOppositeDirectionTable() {
-    constexpr std::array<Board::Directions, NUM_TOTAL_DIRECTIONS> oppositeDirections {
-        Board::south, Board::north, Board::west, Board::east, Board::southEast, Board::southWest,
-        Board::northEast, Board::northWest, Board::southSouthWest, Board::southWestWest, Board::southSouthEast,
-        Board::southEastEast, Board::northNorthWest, Board::northWestWest, Board::northNorthEast, Board::northEastEast,
-    };
-
-    return oppositeDirections;
-}
-
-constinit const std::array<int16_t, NUM_TOTAL_DIRECTIONS> directionOffsetTable { genDirectionOffsetTable() }; 
-constinit const std::array<Board::Directions, NUM_TOTAL_DIRECTIONS> oppositeDirectionTable { genOppositeDirectionTable() }; 
+constinit const std::array<int16_t, NUM_TOTAL_DIRECTIONS> directionOffsetTable { 
+    northOffset, southOffset, eastOffset, westOffset, northEastOffset, northWestOffset, 
+    southWestOffset, southEastOffset, northNorthEastOffset, northEastEastOffset, northNorthWestOffset,
+    northWestWestOffset, southSouthEastOffset, southEastEastOffset, southSouthWestOffset, southWestWestOffset
+}; 
 
 int16_t Board::getDirectionOffset(Directions dir) { 
     assert(dir >= 0 && dir <= NUM_TOTAL_DIRECTIONS);
@@ -72,6 +63,12 @@ int16_t Board::getDirectionOffset(int dir) {
     assert(dir >= 0 && dir <= NUM_TOTAL_DIRECTIONS);
     return directionOffsetTable[dir];
 }
+
+constinit const std::array<Board::Directions, NUM_TOTAL_DIRECTIONS> oppositeDirectionTable { 
+    Board::south, Board::north, Board::west, Board::east, Board::southEast, Board::southWest,
+    Board::northEast, Board::northWest, Board::southSouthWest, Board::southWestWest, Board::southSouthEast,
+    Board::southEastEast, Board::northNorthWest, Board::northWestWest, Board::northNorthEast, Board::northEastEast,    
+}; 
 
 Board::Directions Board::getOppositeDirection(Directions dir) {
     assert(dir >= 0 && dir <= NUM_TOTAL_DIRECTIONS);
