@@ -17,7 +17,7 @@ int Search::alphaBetaMax(GameState* state, int& alpha, int& beta, int depthLeft)
     for(int i = 0; i < moveList.size(); ++i) {
         state->makeMove(moveList[i]);
         int score = alphaBetaMin(state, alpha, beta, depthLeft-1);
-        state->unMakeMove();
+        state->unMakeMove(moveList[i]);
 
         if(score > bestValue) {
             bestValue = score;
@@ -43,7 +43,7 @@ int Search::alphaBetaMin(GameState* state, int& alpha, int& beta, int depthLeft)
     for(int i = 0; i < moveList.size(); ++i) {
         state->makeMove(moveList[i]);
         int score = alphaBetaMax(state, alpha, beta, depthLeft-1);
-        state->unMakeMove();
+        state->unMakeMove(moveList[i]);
 
         if(score < bestValue) {
             bestValue = score;
@@ -68,7 +68,7 @@ Move Search::bestMove(GameState* state, int depth) {
         int alpha = INT_MIN, beta = INT_MAX;
         state->makeMove(moveList[i]);
         int score = alphaBetaMin(state, alpha, beta, depth-1);
-        state->unMakeMove();
+        state->unMakeMove(moveList[i]);
 
         if(score > bestValue) {
             bestValue = score;
