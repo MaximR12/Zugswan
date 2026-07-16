@@ -2,13 +2,15 @@
 
 class GameState;
 
-class Search {
-private:    
-    int alphaBetaMax(GameState* state, int& alpha, int& beta, int depthLeft);
-    int alphaBetaMin(GameState* state, int& alpha, int& beta, int depthLeft);
+constexpr int MAX_SEARCH_DEPTH = 32;
 
-public:
-    Search() { };
+enum class SearchType {
+    time, depth, nodes, movetime, infinite
+};
 
-    Move bestMove(GameState* state, int depth);
+namespace Search {
+    template<SearchType type>
+    void Search(GameState* state, int depth); 
+
+    template void Search<SearchType::depth>(GameState*, int);
 };

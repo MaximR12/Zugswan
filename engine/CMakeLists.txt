@@ -7,7 +7,6 @@ target_sources(Engine PRIVATE
   src/gamestate.cpp
   src/movegen.cpp
   src/board.cpp
-  src/engine.cpp
   src/tables.cpp
   src/search.cpp
   tests/perft.cpp

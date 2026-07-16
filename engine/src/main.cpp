@@ -4,8 +4,7 @@ int main() {
     Tables::init();
 
     GameState game{};
-    Engine engine{&game};
-    UCI uci{&game, &engine};
+    UCI uci{&game};
 
     uci.run();
 

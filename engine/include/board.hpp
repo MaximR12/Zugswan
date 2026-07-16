@@ -136,6 +136,8 @@ public:
     void updateKingCastleRights(PieceColor color, bool castleRights) { m_kingCastleRights[color] = castleRights; }
     void updateQueenCastleRights(PieceColor color, bool castleRights) { m_queenCastleRights[color] = castleRights; }
     void updateHalfMoveClock(uint16_t halfMoveClock) { m_halfMoveClock = halfMoveClock; }
+    void incrementHalfMoveClock() { ++m_halfMoveClock; }
+    void resetHalfMoveClock() { m_halfMoveClock = 0; }
     void updateOccupiedBB(uint64_t BB) { m_occupiedBB = BB; }
     void updateEmptyBB(uint64_t BB) { m_emptyBB = BB; }
     void clearPosition();

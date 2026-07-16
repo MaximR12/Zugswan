@@ -1,11 +1,9 @@
 #include <thread>
 #include "gamestate.hpp"
-#include "engine.hpp"
 
 class UCI {
 private:
     GameState* m_state;
-    Engine* m_engine;
     std::thread m_worker;
     std::atomic<bool> m_working;
 
@@ -14,7 +12,7 @@ private:
     void bench(std::istringstream& args);
 
 public:
-    UCI(GameState* state, Engine* engine) : m_state{state}, m_engine{engine}, m_worker{}, m_working{false} { }
+    UCI(GameState* state) : m_state{state}, m_worker{}, m_working{false} { }
 
     void run();
 };

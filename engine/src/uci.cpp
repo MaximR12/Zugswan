@@ -2,6 +2,7 @@
 #include <format>
 #include "uci.hpp"
 #include "perft.hpp"
+#include "search.hpp"
 #include "sstream"
 
 void UCI::go(std::istringstream& args) {
@@ -21,7 +22,14 @@ void UCI::go(std::istringstream& args) {
             Perft::run<Perft::divide>(state, depth);
             m_working = false;
         }};
-    } 
+    } else if(token == "depth") {
+        int depth;
+        args >> depth;
+        m_worker = std::thread{[state = m_state, this, depth]() {
+            Search::Search<SearchType::depth>(state, depth);
+            m_working = false;
+        }};
+    }
 }
 
 void UCI::position(std::istringstream& args) {
