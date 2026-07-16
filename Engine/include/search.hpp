@@ -10,7 +10,8 @@ enum class SearchType {
 
 namespace Search {
     template<SearchType type>
-    void Search(GameState* state, int depth); 
+    void Search(GameState* state, int depth=0); 
 
     template void Search<SearchType::depth>(GameState*, int);
+    template void Search<SearchType::time>(GameState*, int);
 };
