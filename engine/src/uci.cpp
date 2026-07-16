@@ -29,6 +29,24 @@ void UCI::go(std::istringstream& args) {
             Search::Search<SearchType::depth>(state, depth);
             m_working = false;
         }};
+    } else if(token == "wtime" || token == "btime"){
+        int wTime=0, bTime=0, wInc=0, bInc=0;
+        do {
+            if(token == "wtime")
+                args >> wTime;
+            else if(token == "winc")
+                args >> wInc;
+            else if(token == "btime")
+                args >> bTime;
+            else if(token == "binc")
+                args >> bInc;
+        } while(args >> token);
+
+        m_state->updateTime(wTime, bTime, wInc, bInc);
+        m_worker = std::thread{[state = m_state, this]() {
+            Search::Search<SearchType::time>(state);
+            m_working = false;
+        }};
     }
 }
 
@@ -91,7 +109,9 @@ void UCI::run() {
         else if(token == "bench")
             bench(is);
         else if(token == "isready")
-            std::cout << "readyok\n";
+            std::cout << "readyok" << std::endl;
+        else if(token == "uci")
+            std::cout << "id name Zugswan\nid author Max\nuciok" << std::endl;
 
     } while(token != "quit");
 

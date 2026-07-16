@@ -26,6 +26,11 @@ private:
     Board::PieceColor m_turn;
     bool m_inCheck;
 
+    int m_whiteTime;
+    int m_whiteInc;
+    int m_blackTime;
+    int m_blackInc;
+
 public:
     GameState();
 
@@ -45,7 +50,13 @@ public:
 
     void updateLegalMoves() { m_legalMoves.clear(); MoveGen::getLegalMoves(&m_board, m_turn, m_legalMoves); }
     void getLegalMoves(FixedVector<Move, MAX_LEGAL_MOVES>& moveList) { m_inCheck = MoveGen::getLegalMoves(&m_board, m_turn, moveList); };
+
+    void updateTime(int wTime, int bTime, int wInc=0, int bInc=0) { m_whiteTime = wTime; m_whiteInc = wInc; m_blackTime = bTime; m_blackInc = bInc; }
+    int getTime() { return m_turn == Board::white ? m_whiteTime : m_blackTime; }
+    int getInc() { return m_turn == Board::white ? m_whiteInc : m_blackInc; }
     
     static uint16_t getRow(uint16_t sq) { return ROW_LEN - sq / ROW_LEN; }
     static uint16_t getCol(uint16_t sq) { return sq % ROW_LEN; }
+
+    static int getMoveTime(int base, int increment) { return base / 40 + increment / 2; }
 };
