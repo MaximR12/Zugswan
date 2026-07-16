@@ -6,75 +6,45 @@ int evaluate(GameState* state) {
     return state->getTurn() == Board::white ? Board::materialBalance(state->getBoard()) : -Board::materialBalance(state->getBoard());
 }
 
-int Search::alphaBetaMax(GameState* state, int& alpha, int& beta, int depthLeft) {
-    if(depthLeft == 0)
+int alphaBeta(GameState* state, FixedVector<Move, MAX_SEARCH_DEPTH>& prevMoveLine, int alpha, int beta, int depth) {
+    if(depth == 0) 
         return evaluate(state);
 
+    FixedVector<Move, MAX_SEARCH_DEPTH> moveLine;
     FixedVector<Move, MAX_LEGAL_MOVES> moveList;
     state->getLegalMoves(moveList);
 
-    int bestValue = INT_MIN;
-    for(int i = 0; i < moveList.size(); ++i) {
-        state->makeMove(moveList[i]);
-        int score = alphaBetaMin(state, alpha, beta, depthLeft-1);
-        state->unMakeMove(moveList[i]);
+    if(moveList.size() == 0)
+        return state->inCheck() ? -1000 : 0;
 
-        if(score > bestValue) {
-            bestValue = score;
-            if(score > alpha)
-                alpha = score;
-        }
+    for(Move move : moveList) {
+        state->makeMove(move);
+        int score = -alphaBeta(state, moveLine, -beta, -alpha, depth-1);
+        state->unmakeMove(move);
 
         if(score >= beta)
-            return score;
-    }
+            return beta;
 
-    return bestValue;
-}
-
-int Search::alphaBetaMin(GameState* state, int& alpha, int& beta, int depthLeft) {
-    if(depthLeft == 0)
-        return -evaluate(state);
-
-    FixedVector<Move, MAX_LEGAL_MOVES> moveList;
-    state->getLegalMoves(moveList);
-
-    int bestValue = INT_MAX;
-    for(int i = 0; i < moveList.size(); ++i) {
-        state->makeMove(moveList[i]);
-        int score = alphaBetaMax(state, alpha, beta, depthLeft-1);
-        state->unMakeMove(moveList[i]);
-
-        if(score < bestValue) {
-            bestValue = score;
-            if(score < beta)
-                beta = score;
-        }
-
-        if(score <= alpha)
-            return score;
-    }
-
-    return bestValue;
-}
-
-Move Search::bestMove(GameState* state, int depth) {
-    FixedVector<Move, MAX_LEGAL_MOVES> moveList;
-    state->getLegalMoves(moveList);
-    assert(moveList.size() > 0);
-
-    int bestValue = INT_MIN, bestMoveInd = 0;
-    for(int i = 1; i < moveList.size(); ++i) {
-        int alpha = INT_MIN, beta = INT_MAX;
-        state->makeMove(moveList[i]);
-        int score = alphaBetaMin(state, alpha, beta, depth-1);
-        state->unMakeMove(moveList[i]);
-
-        if(score > bestValue) {
-            bestValue = score;
-            bestMoveInd = i;
+        if(score > alpha) {
+            alpha = score;
+            prevMoveLine[0] = move;
+            prevMoveLine.push_vec(moveLine, 1);
         }
     }
 
-    return moveList[bestMoveInd];
+    return alpha;
+}
+
+template<SearchType type>
+void Search::Search(GameState* state, int depth) {
+    Board::PieceColor turn = state->getTurn();
+    FixedVector<Move, MAX_SEARCH_DEPTH> moveLine;
+    
+    int score;
+    if constexpr (type == SearchType::depth) 
+        score = alphaBeta(state, moveLine, -1000, 1000, depth);
+
+    std::cout << "Value: " << score << '\n';
+    for(Move move : moveLine)
+        std::cout << Board::getMoveString(move) << '\n';
 }

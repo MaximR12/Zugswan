@@ -188,15 +188,15 @@ uint16_t Board::serializeBitboard(uint64_t BB, std::array<uint16_t, NUM_SQUARES>
     return count;
 }
 
-int materialCount(Board* board, Board::PieceColor side) {
-    std::unordered_map<int, int> valueMap {
-        {Board::pawns, 1}, {Board::knights, 3}, {Board::bishops, 3}, {Board::rooks, 5}, {Board::queens, 9}
-    };
+const std::unordered_map<int, int> valueMap {
+    {Board::pawns, 1}, {Board::knights, 3}, {Board::bishops, 3}, {Board::rooks, 5}, {Board::queens, 9}
+};
 
+int materialCount(Board* board, Board::PieceColor side) {
     int material = 0;
-    for(int type = 0; type < 6; ++type) {
-        int count = std::popcount(board->getPieceSet(static_cast<Board::PieceType>(type), Board::white));
-        material += count * valueMap[type];
+    for(int type = Board::pawns; type < Board::king; ++type) {
+        int count = std::popcount(board->getPieceSet(static_cast<Board::PieceType>(type), side));
+        material += count * valueMap.at(type);
     }
 
     return material;
@@ -294,7 +294,9 @@ std::string Board::getIndexStr(uint16_t index) {
 
 std::string Board::getMoveString(Move move) {
     uint16_t from = move.getFrom(), to = move.getTo();
-    return std::format("{}{}", getIndexStr(from), getIndexStr(to));
+    std::string moveStr = std::format("{}{}", getIndexStr(from), getIndexStr(to));
+    std::array<char, 4> typeCharMap {'n', 'b', 'r', 'q'};
+    return !move.isPromotion() ? moveStr : moveStr + typeCharMap[Board::getPromoType(move.getFlag())-2];
 }
 
 void Board::printBitBoard(uint64_t BB) {

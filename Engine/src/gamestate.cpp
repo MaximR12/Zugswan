@@ -1,18 +1,21 @@
 #include "gamestate.hpp"
+#include <unordered_map>
 #include <chrono>
 
-GameState::GameState() : m_state{State::inProgress}, m_turn{Board::white}, m_legalMoves{} { 
+GameState::GameState() : m_turn{Board::white}, m_legalMoves{} { 
     loadStartPos();
 }
 
-void updateCastleRights(Board& board, Board::PieceColor fromColor, uint64_t fromBB) {
-    uint64_t king = board.getPieceSet(Board::king, fromColor);
-    uint64_t nullIfKingRookMove = Board::nullBoolMask(fromBB & king << 3);
-    uint64_t nullIfQueenRookMove = Board::nullBoolMask(fromBB & king >> 4);
-    uint64_t nullIfKingMove = Board::nullBoolMask(fromBB & king);
+void updateCastleRights(Board& board, Board::PieceColor fromColor, Board::PieceColor oppColor, uint64_t fromBB, uint64_t toBB) {
+    uint64_t king = board.getPieceSet(Board::king, fromColor), rooks = board.getPieceSet(Board::rooks, fromColor);
+    bool nullIfKingRookMove = !(fromBB & (king << 3));
+    bool kingRookExists = rooks & (king << 3);
+    bool nullIfQueenRookMove = !(fromBB & (king >> 4));
+    bool queenRookExists = rooks & (king >> 4);
+    bool nullIfKingMove = !(fromBB & king);
 
-    board.updateKingCastleRights(fromColor, (nullIfKingRookMove & nullIfKingMove) & Board::fullBoolMask(board.getKingCastleRights(fromColor)));
-    board.updateQueenCastleRights(fromColor, (nullIfQueenRookMove & nullIfKingMove) & Board::fullBoolMask(board.getQueenCastleRights(fromColor)));
+    board.updateKingCastleRights(fromColor, (nullIfKingRookMove & nullIfKingMove) & kingRookExists & board.getKingCastleRights(fromColor));
+    board.updateQueenCastleRights(fromColor, (nullIfQueenRookMove & nullIfKingMove) & queenRookExists & board.getQueenCastleRights(fromColor));
 }
 
 void updateOccupied(Board& board, uint64_t occupied) {
@@ -49,7 +52,7 @@ void GameState::makeMove(Move move) {
     Board::PieceColor oppColor = Board::getOppositeColor(fromColor);
     Board::PieceType fromType = m_board.getPieceType(fromInd);
 
-    updateCastleRights(m_board, fromColor, fromBB);
+    updateCastleRights(m_board, fromColor, oppColor, fromBB, toBB);
     m_board.updateEnPassantTargets(oppColor, 0ULL);
 
     uint16_t flag = move.getFlag();
@@ -57,6 +60,7 @@ void GameState::makeMove(Move move) {
         movePiece(m_board, fromType, fromColor, fromToBB);
         updateOccupied(m_board, m_board.getOccupied() ^ fromToBB);
     } else {
+        m_board.resetHalfMoveClock();
         Board::PieceType captureType = m_board.getPieceType(toInd);
         m_undoStack.back().captureType = captureType;
         movePiece(m_board, fromType, fromColor, fromToBB);
@@ -65,6 +69,7 @@ void GameState::makeMove(Move move) {
     }
 
     if(fromType == Board::pawns) {
+        m_board.resetHalfMoveClock();
         if(flag == DOUBLE_PAWN_PUSH) {
             uint64_t epTarget, epCapturers;
             if(fromColor == Board::white) {
@@ -119,10 +124,11 @@ void GameState::makeMove(Move move) {
         updateOccupied(m_board, m_board.getOccupied() ^ rookFromToBB); 
     }
 
+    m_board.incrementHalfMoveClock();
     switchTurn();
 }
 
-void GameState::unMakeMove(Move move) {
+void GameState::unmakeMove(Move move) {
     assert(m_undoStack.size() > 0);
 
     StateInfo& stateInfo = m_undoStack.back();
@@ -201,13 +207,21 @@ void GameState::loadPosition(std::string fen) {
 }
 
 void GameState::moveFromList(std::vector<std::string>& moveList) {
+    std::unordered_map<char, Board::PieceType> charPieceMap {
+        {'n', Board::knights}, {'b', Board::bishops}, {'r', Board::rooks}, {'q', Board::queens} 
+    };
+
     for(int i = 0; i < moveList.size(); ++i) {
         std::string moveStr = moveList[i];
         uint16_t from = Board::getIndexSquare(moveStr.substr(0, 2));
         uint16_t to = Board::getIndexSquare(moveStr.substr(2, 2));
+        Board::PieceType promoType = moveStr.size() == 4 ? Board::invalid : charPieceMap[moveStr[4]];
 
         for(int j = 0; j < m_legalMoves.size(); ++j) {
             Move curr = m_legalMoves[j];
+            if(curr.isPromotion() && (Board::getPromoType(curr.getFlag()) != promoType))
+                continue;
+
             if(curr.getFrom() == from && curr.getTo() == to) {
                 makeMove(curr);
                 updateLegalMoves();

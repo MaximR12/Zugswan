@@ -6,8 +6,13 @@
 #include "fixedvector.hpp"
 #include <vector> 
 
+enum class State {
+    draw, whiteMate, blackMate, inProgress
+};
+
 namespace MoveGen {
 
-    void getLegalMoves(Board* board, Board::PieceColor color, FixedVector<Move, MAX_LEGAL_MOVES>& moveList);
+    //return true if in check
+    bool getLegalMoves(Board* board, Board::PieceColor color, FixedVector<Move, MAX_LEGAL_MOVES>& moveList);
 
 }

@@ -17,25 +17,20 @@ struct StateInfo {
     bool queenCastleRights;
 };
 
-enum class State {
-    draw, whiteMate, blackMate, inProgress
-};
-
 class GameState {
 private:
     FixedVector<StateInfo, UNDO_STACK_SIZE> m_undoStack;
-    Board m_board;
-
-    Board::PieceColor m_turn;
-    State m_state;
-
     FixedVector<Move, MAX_LEGAL_MOVES> m_legalMoves;
     
+    Board m_board;
+    Board::PieceColor m_turn;
+    bool m_inCheck;
+
 public:
     GameState();
 
     void makeMove(Move move);
-    void unMakeMove(Move move);
+    void unmakeMove(Move move);
 
     void switchTurn() { m_turn = Board::getOppositeColor(m_turn); }
     const Board::PieceColor getTurn() const { return m_turn; }
@@ -45,11 +40,11 @@ public:
     void moveFromList(std::vector<std::string>& moveList);
 
     Board* getBoard() { return &m_board; }
-    State getState() { return m_state; }
-    State determineEndState(); //calculate end state assuming there are no legal moves
+
+    bool inCheck() const { return m_inCheck; }
 
     void updateLegalMoves() { m_legalMoves.clear(); MoveGen::getLegalMoves(&m_board, m_turn, m_legalMoves); }
-    void getLegalMoves(FixedVector<Move, MAX_LEGAL_MOVES>& moveList) { return MoveGen::getLegalMoves(&m_board, m_turn, moveList); };
+    void getLegalMoves(FixedVector<Move, MAX_LEGAL_MOVES>& moveList) { m_inCheck = MoveGen::getLegalMoves(&m_board, m_turn, moveList); };
     
     static uint16_t getRow(uint16_t sq) { return ROW_LEN - sq / ROW_LEN; }
     static uint16_t getCol(uint16_t sq) { return sq % ROW_LEN; }

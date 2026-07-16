@@ -319,7 +319,7 @@ void generateMasks(Board* board, std::array<uint64_t, NUM_MASK_TYPES>& masks, st
 }
 
 template<Board::PieceColor color>
-void generate(Board* board, FixedVector<Move, MAX_LEGAL_MOVES>& moveList) {
+bool generate(Board* board, FixedVector<Move, MAX_LEGAL_MOVES>& moveList) {
    std::array<uint16_t, NUM_SQUARES> indBuf;
    std::array<uint64_t, NUM_MASK_TYPES> masks;
    std::array<uint64_t, NUM_SQUARES> pinMasks;
@@ -329,9 +329,11 @@ void generate(Board* board, FixedVector<Move, MAX_LEGAL_MOVES>& moveList) {
    appendKnightMoves<color>(board, moveList, indBuf, masks);
    appendPawnMoves<color>(board, moveList, indBuf, masks);
    appendKingMoves<color>(board, moveList, masks);
+
+   return !masks[Board::notInCheck];
 }
 
-void MoveGen::getLegalMoves(Board* board, Board::PieceColor color, FixedVector<Move, MAX_LEGAL_MOVES>& moveList) {
+bool MoveGen::getLegalMoves(Board* board, Board::PieceColor color, FixedVector<Move, MAX_LEGAL_MOVES>& moveList) {
    assert(Tables::initialized);
-   color == Board::white ? generate<Board::white>(board, moveList) : generate<Board::black>(board, moveList); 
+   return color == Board::white ? generate<Board::white>(board, moveList) : generate<Board::black>(board, moveList); 
 }
