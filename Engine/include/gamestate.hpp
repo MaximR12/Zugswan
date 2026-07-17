@@ -58,5 +58,5 @@ public:
     static uint16_t getRow(uint16_t sq) { return ROW_LEN - sq / ROW_LEN; }
     static uint16_t getCol(uint16_t sq) { return sq % ROW_LEN; }
 
-    static int getMoveTime(int base, int increment) { return base / 40 + increment / 2; }
+    static int getMoveTime(int base, int increment) { return base / 20 + increment / 2; }
 };

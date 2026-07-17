@@ -1,6 +1,6 @@
 #include "uci.hpp"
 
-int main() { 
+int main() {
     Tables::init();
 
     GameState game{};

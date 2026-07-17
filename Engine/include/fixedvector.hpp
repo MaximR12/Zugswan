@@ -22,7 +22,7 @@ public:
     void push_back() { assert(m_size < N); m_size++; }
     void push_back(const T& elem) { assert(m_size < N); m_data[m_size++] = elem; }
     void pop_back() { assert(m_size > 0); --m_size; }
-    T& operator[](size_t i) { assert(i < m_size); return m_data[i]; }
+    T& operator[](size_t i) { return m_data[i]; }
 };
 
 template<typename T, size_t N>
