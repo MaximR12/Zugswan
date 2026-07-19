@@ -18,13 +18,13 @@ int alphaBeta(GameState* state, FixedVector<Move, MAX_SEARCH_DEPTH>& prevMoveLin
     if(depth == 0) 
         return evaluate(state);
 
-    FixedVector<Move, MAX_SEARCH_DEPTH> moveLine;
     FixedVector<Move, MAX_LEGAL_MOVES> moveList;
     state->getLegalMoves(moveList);
 
     if(moveList.size() == 0) 
         return state->inCheck() ? -INT_MAX : 0;
 
+    FixedVector<Move, MAX_SEARCH_DEPTH> moveLine;
     for(Move move : moveList) {
         state->makeMove(move);
         int score = -alphaBeta(state, moveLine, -beta, -alpha, depth-1);
