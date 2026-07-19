@@ -1,7 +1,14 @@
 #include "tables.hpp"
 #include <chrono>
 
-void initRankAttacks(std::array<std::array<uint64_t, NUM_SQUARES>, NUM_SLIDER_DIRECTIONS>& rayAttackTable, std::array<std::array<uint64_t, NUM_SQUARES>, 4>& sliderAttackTable) {
+std::array<std::array<uint64_t, NUM_SQUARES>, 2> pawnAttackTable;
+std::array<uint64_t, NUM_SQUARES> kingMoveTable;
+std::array<uint64_t, NUM_SQUARES> knightMoveTable;
+
+std::array<std::array<uint64_t, NUM_SQUARES>, NUM_SLIDER_DIRECTIONS> rayAttackTable;
+std::array<std::array<uint64_t, NUM_SQUARES>, 4> sliderAttackTable; 
+
+void initRankAttacks() {
     uint64_t east = 0x00000000000000FEULL, nextRank = RANK_1;
     for(int sq = 0; sq < NUM_SQUARES; ++sq, east <<= 1) {
         if(sq % 8 == 0) nextRank <<= 8;
@@ -18,7 +25,7 @@ void initRankAttacks(std::array<std::array<uint64_t, NUM_SQUARES>, NUM_SLIDER_DI
     }
 }
 
-void initFileAttacks(std::array<std::array<uint64_t, NUM_SQUARES>, NUM_SLIDER_DIRECTIONS>& rayAttackTable, std::array<std::array<uint64_t, NUM_SQUARES>, 4>& sliderAttackTable) {
+void initFileAttacks() {
     uint64_t north = 0x0101010101010100ULL;
     for(int sq = 0; sq < NUM_SQUARES; ++sq, north <<= 1) { 
         rayAttackTable[Board::north][sq] = north;
@@ -32,7 +39,7 @@ void initFileAttacks(std::array<std::array<uint64_t, NUM_SQUARES>, NUM_SLIDER_DI
     }
 }
 
-void initDiagAttacks(std::array<std::array<uint64_t, NUM_SQUARES>, NUM_SLIDER_DIRECTIONS>& rayAttackTable, std::array<std::array<uint64_t, NUM_SQUARES>, 4>& sliderAttackTable) {
+void initDiagAttacks() {
     uint64_t northEast = 0x8040201008040200ULL;
     for(int file = 0; file < 8; ++file, northEast = Board::shift<Board::east>(northEast)) {
         uint64_t ne = northEast;
@@ -52,7 +59,7 @@ void initDiagAttacks(std::array<std::array<uint64_t, NUM_SQUARES>, NUM_SLIDER_DI
     }
 }
 
-void initAntiDiagAttacks(std::array<std::array<uint64_t, NUM_SQUARES>, NUM_SLIDER_DIRECTIONS>& rayAttackTable, std::array<std::array<uint64_t, NUM_SQUARES>, 4>& sliderAttackTable) {
+void initAntiDiagAttacks() {
     uint64_t northWest = 0x0102040810204000ULL;
     for(int file = 7; file >= 0; --file, northWest = Board::shift<Board::west>(northWest)) {
         uint64_t nw = northWest;
@@ -72,15 +79,12 @@ void initAntiDiagAttacks(std::array<std::array<uint64_t, NUM_SQUARES>, NUM_SLIDE
     }
 }
 
-std::array<std::array<uint64_t, NUM_SQUARES>, NUM_SLIDER_DIRECTIONS> rayAttackTable;
-std::array<std::array<uint64_t, NUM_SQUARES>, 4> sliderAttackTable; 
-
 void initRayAttackTables() 
 {
-    initRankAttacks(rayAttackTable, sliderAttackTable);
-    initFileAttacks(rayAttackTable, sliderAttackTable);
-    initDiagAttacks(rayAttackTable, sliderAttackTable);
-    initAntiDiagAttacks(rayAttackTable, sliderAttackTable);
+    initRankAttacks();
+    initFileAttacks();
+    initDiagAttacks();
+    initAntiDiagAttacks();
 }
 
 uint64_t Tables::getRayMoves(uint16_t ind, Board::Directions dir) {
@@ -93,7 +97,7 @@ uint64_t Tables::getSliderMoves(uint16_t ind, Board::SliderRays dir) {
     return sliderAttackTable[dir][ind];
 }
 
-void initPawnAttackTables(std::array<std::array<uint64_t, NUM_SQUARES>, 2>& pawnAttackTable) {
+void initPawnAttackTables() {
     uint64_t currBB = 1;
     for(int i = 0; i < NUM_SQUARES; ++i, currBB <<= 1) 
         pawnAttackTable[Board::white][i] = Board::whitePawnTargets(currBB);
@@ -103,16 +107,16 @@ void initPawnAttackTables(std::array<std::array<uint64_t, NUM_SQUARES>, 2>& pawn
         pawnAttackTable[Board::black][i] = Board::blackPawnTargets(currBB);        
 }
 
-void initKnightMoveTable(std::array<uint64_t, NUM_SQUARES>& knightMoveTable) {
+void initKnightMoveTable() {
     uint64_t currBB = 1;
     for(int sq = 0; sq < NUM_SQUARES; ++sq, currBB <<= 1) 
         knightMoveTable[sq] = Board::knightAttackTargets(currBB);
 }
 
-void initKingMoveTable(std::array<uint64_t, NUM_SQUARES>& kingAttackTable) {
+void initKingMoveTable() {
     uint64_t currBB = 1;
     for(int i = 0; i < NUM_SQUARES; ++i, currBB <<= 1) 
-        kingAttackTable[i] = Board::kingAttackTargets(currBB);
+        kingMoveTable[i] = Board::kingAttackTargets(currBB);
 }
 
 using namespace Tables;
@@ -188,6 +192,13 @@ uint64_t rookOccMask(int ind) {
     return mask;
 }
 
+struct magicEntry {
+    size_t offset;
+    uint64_t occMask;
+    uint64_t magic;
+    int shift;
+};
+
 size_t offset = 0;
 std::array<magicEntry, 64> bishopMagic;
 std::array<magicEntry, 64> rookMagic;
@@ -205,6 +216,8 @@ void initRMagic() {
         offset += 1ULL << rookIndexBits[i];
     }
 }
+
+constexpr size_t MAGIC_TABLE_SIZE = 107648;
 
 std::array<uint64_t, MAGIC_TABLE_SIZE> magicTable;
 
@@ -268,6 +281,18 @@ void initMagicTable() {
     genMagicTable<SliderType::rook>();
 }
 
+uint64_t Tables::pawnAttacks(Board::PieceColor side, uint16_t ind) {
+    return pawnAttackTable[side][ind];
+}
+
+uint64_t Tables::knightMoves(uint16_t ind) {
+    return knightMoveTable[ind];
+}
+
+uint64_t Tables::kingMoves(uint16_t ind) {
+    return kingMoveTable[ind];
+}
+
 uint64_t Tables::bishopAttacks(uint16_t square, uint64_t occupied) {
     size_t offset = bishopMagic[square].offset;
     occupied &= bishopMagic[square].occMask;
@@ -286,12 +311,28 @@ uint64_t Tables::rookAttacks(uint16_t square, uint64_t occupied) {
     return magicTable[offset + occupied];
 }
 
+void initZobristTable() {
+    for(int type = Board::pawns; type <= Board::king; ++type)
+        for(int sq = 0; sq < 64; ++sq) 
+            ZTable.pieces[type][sq] = Tables::rand.getRand();
+
+    for(int i = 0; i < Board::numCastleRights; ++i)
+        ZTable.castleRights[i] = Tables::rand.getRand();
+
+    for(int file = 0; file < 8; ++file)
+        ZTable.epFiles[file] = Tables::rand.getRand();
+
+    ZTable.blackSide = Tables::rand.getRand();
+}
+
 void Tables::init() {
     initRayAttackTables();
-    initPawnAttackTables(pawnAttackTable);
-    initKnightMoveTable(knightMoveTable);
-    initKingMoveTable(kingMoveTable);
+    initPawnAttackTables();
+    initKnightMoveTable();
+    initKingMoveTable();
+
     initMagicTable();
+    initZobristTable();
 
     initialized = true;
 }

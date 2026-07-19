@@ -6,8 +6,8 @@
 #include "fixedvector.hpp"
 #include <vector> 
 
-enum class State {
-    draw, whiteMate, blackMate, inProgress
+enum class GenType {
+    quiet, capture, evasion
 };
 
 namespace MoveGen {

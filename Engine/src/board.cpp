@@ -45,7 +45,8 @@ constinit const std::array<Board::PieceType, 4> promoTypeTable {
 };
 
 Board::PieceType Board::getPromoType(uint16_t flag) {
-    assert(Move::isPromotion(flag)); return promoTypeTable[flag & ~(CAPTURE | 0x8)];
+    assert(Move::isPromotion(flag)); 
+    return promoTypeTable[flag & ~(CAPTURE | 0x8)];
 }
 
 constinit const std::array<int16_t, NUM_TOTAL_DIRECTIONS> directionOffsetTable { 
@@ -160,6 +161,19 @@ uint64_t Board::southWestFill(uint64_t sliders, uint64_t empty) {
     empty &= empty >> 18;
     sliders |= empty & (sliders >> 36);
     return shift<Board::southWest>(sliders);
+}
+
+int Board::getFile(uint64_t BB) {
+    assert(BB && !(BB & (BB - 1))); //assert singly occupied bitboard
+
+    uint64_t fileMask = A_FILE;
+    for(int file = 0; file < 8; ++file) {
+        if(fileMask & BB)
+            return file;
+        fileMask <<= 1;
+    }
+
+    return -1;
 }
 
 Board::PieceType Board::getPieceType(uint16_t ind) const {
@@ -296,7 +310,7 @@ std::string Board::getMoveString(Move move) {
     uint16_t from = move.getFrom(), to = move.getTo();
     std::string moveStr = std::format("{}{}", getIndexStr(from), getIndexStr(to));
     std::array<char, 4> typeCharMap {'n', 'b', 'r', 'q'};
-    return !move.isPromotion() ? moveStr : moveStr + typeCharMap[Board::getPromoType(move.getFlag())-2];
+    return !move.isPromotion() ? moveStr : moveStr + typeCharMap[Board::getPromoType(move.getFlag())-1];
 }
 
 void Board::printBitBoard(uint64_t BB) {

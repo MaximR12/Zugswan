@@ -37,6 +37,7 @@ constexpr uint64_t RANK_7 = 0x00FF000000000000ULL;
 constexpr uint64_t RANK_8 = 0xFF00000000000000ULL;
 
 constexpr uint64_t NOT_A_FILE = 0xFEFEFEFEFEFEFEFEULL; 
+constexpr uint64_t A_FILE = ~NOT_A_FILE;
 constexpr uint64_t NOT_AB_FILE = 0xFCFCFCFCFCFCFCFCULL; 
 constexpr uint64_t NOT_H_FILE = 0x7F7F7F7F7F7F7F7FULL;
 constexpr uint64_t NOT_GH_FILE = 0x3F3F3F3F3F3F3F3FULL;
@@ -84,6 +85,7 @@ constexpr int ROW_LEN = 8;
 
 class Board {
 private:
+    uint64_t zobrist;
     std::array<std::array<uint64_t, NUM_PIECE_TYPES>, 2> m_pieceBB;
     std::array<uint64_t, 2> m_enPassantTargets;
     uint64_t m_emptyBB;
@@ -99,8 +101,23 @@ public:
     };
 
     enum PieceType {
-        all, pawns, knights, bishops, rooks, queens, king,
-        invalid
+        pawns, knights, bishops, rooks, queens, king,
+        all, invalid
+    };
+
+    enum CastleRights : uint8_t {
+        noRights,
+        whiteKing,
+        whiteQueen = whiteKing << 1,
+        blackKing = whiteQueen << 1,
+        blackQueen = blackKing << 1,
+
+        kingRights = whiteKing | blackKing,
+        queenRights = whiteQueen | blackQueen,
+
+        cAll = kingRights | queenRights,
+
+        numCastleRights = 16
     };
 
     enum Directions {
@@ -113,21 +130,17 @@ public:
         hor, ver, diag, anti
     };
 
-    //mask types used in move generation
-    enum MaskTypes { 
-        pinned, verMovable, diagMovable, antiMovable, targetMask, pawnTargetMask, kingTargetMask, drawMask, notInCheck
-    };
-
     Board() { }
 
     uint64_t getPieceSet(PieceType type, PieceColor color) const { return m_pieceBB[color][type]; }
     uint64_t getEnPassantTarget(PieceColor color) const { return m_enPassantTargets[color]; }
+    uint8_t getCastleRights() const  
+        { return (m_kingCastleRights[Board::white]<<0) | (m_queenCastleRights[Board::white]<<1) | (m_kingCastleRights[Board::black]<<2) | (m_queenCastleRights[Board::black]<<3); }
     bool getKingCastleRights(PieceColor color) const { return m_kingCastleRights[color]; }
     bool getQueenCastleRights(PieceColor color) const { return m_queenCastleRights[color]; }
     uint64_t getOccupied() const { return m_occupiedBB; }
     uint64_t getEmpty() const { return m_emptyBB; }
     uint16_t getHalfMoveClock() const { return m_halfMoveClock; }
-
     PieceColor getPieceColor(uint16_t ind) const { assert(ind >= 0 && ind < NUM_SQUARES); return m_pieceBB[white][all]&(1ULL<<ind) ? white : black; }
     PieceType getPieceType(uint16_t ind) const;
 
@@ -140,6 +153,7 @@ public:
     void resetHalfMoveClock() { m_halfMoveClock = 0; }
     void updateOccupiedBB(uint64_t BB) { m_occupiedBB = BB; }
     void updateEmptyBB(uint64_t BB) { m_emptyBB = BB; }
+
     void clearPosition();
     PieceColor loadPosition(std::string& fen); //return turn, halfmove and fullmove info for gamestate
 
@@ -191,6 +205,7 @@ public:
     static PieceColor getOppositeColor(PieceColor color) { return static_cast<Board::PieceColor>((color + 1)%2); }
     static bool isNegative(Directions dir);
 
+    static int getFile(uint64_t BB);
     static uint16_t bitScan(uint64_t BB, bool reverse);
     static uint16_t bitScanForward(uint64_t BB) { assert(BB != 0); return std::countr_zero(BB); }
     static uint16_t bitScanReverse(uint64_t BB) { assert(BB != 0); return 63 - std::countl_zero(BB); }

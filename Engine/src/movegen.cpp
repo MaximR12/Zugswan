@@ -2,6 +2,17 @@
 #include <unordered_map>
 #include "movegen.hpp"
 
+struct Masks {
+   uint64_t pinned;
+   uint64_t verMovable;
+   uint64_t diagMovable;
+   uint64_t antiMovable;
+   uint64_t targetMask;
+   uint64_t pawnTargetMask;
+   uint64_t kingTargetMask;
+   uint64_t notInCheck;
+};
+
 uint64_t getPositiveRayAttacks(uint16_t square, uint64_t occupied, Board::Directions dir) {
    uint64_t attacks = Tables::getRayMoves(square, dir);
    uint64_t blocker = attacks & occupied;
@@ -99,7 +110,7 @@ void serializeMoves(Board* board, FixedVector<Move, MAX_LEGAL_MOVES>& moveList, 
 
 template<Board::PieceColor color>
 void appendSliderMoves(Board* board, FixedVector<Move, MAX_LEGAL_MOVES>& moveList, std::array<uint16_t, NUM_SQUARES>& indBuf,
-      std::array<uint64_t, NUM_MASK_TYPES>& masks, std::array<uint64_t, NUM_SQUARES>& pinMasks)
+      std::array<uint64_t, NUM_SQUARES>& pinMasks, Masks& masks)
 {
    uint64_t occupied = board->getOccupied();
    uint64_t rookLike = board->getPieceSet(Board::rooks, color) | board->getPieceSet(Board::queens, color);
@@ -112,11 +123,11 @@ void appendSliderMoves(Board* board, FixedVector<Move, MAX_LEGAL_MOVES>& moveLis
       uint64_t psuedoLegal = Tables::rookAttacks(square, occupied);
 
       uint64_t pinMask = UNIVERSE;
-      if(squareBB & masks[Board::pinned])
+      if(squareBB & masks.pinned)
          pinMask = pinMasks[square];
 
-      uint64_t legal = psuedoLegal & pinMask & masks[Board::targetMask];
-      if(legal) serializeMoves<color, MoveType::slider>(board, moveList, legal, square);
+      uint64_t legal = psuedoLegal & pinMask & masks.targetMask;
+      if(legal) serializeMoves<color, MoveType::normal>(board, moveList, legal, square);
    }
 
    uint16_t numBishopLike = Board::serializeBitboard(bishopLike, indBuf);
@@ -126,40 +137,33 @@ void appendSliderMoves(Board* board, FixedVector<Move, MAX_LEGAL_MOVES>& moveLis
       uint64_t psuedoLegal = Tables::bishopAttacks(square, occupied);
 
       uint64_t pinMask = UNIVERSE;
-      if(squareBB & masks[Board::pinned])
+      if(squareBB & masks.pinned)
          pinMask = pinMasks[square];
       
-      uint64_t legal = psuedoLegal & pinMask & masks[Board::targetMask];
-      if(legal) serializeMoves<color, MoveType::slider>(board, moveList, legal, square);
+      uint64_t legal = psuedoLegal & pinMask & masks.targetMask;
+      if(legal) serializeMoves<color, MoveType::normal>(board, moveList, legal, square);
    }
 }
 
 template<Board::PieceColor color>
-void appendKnightMoves(Board* board, FixedVector<Move, MAX_LEGAL_MOVES>& moveList, std::array<uint16_t, NUM_SQUARES>& indBuf,
-      std::array<uint64_t, NUM_MASK_TYPES>& masks)
-{
+void appendKnightMoves(Board* board, FixedVector<Move, MAX_LEGAL_MOVES>& moveList, std::array<uint16_t, NUM_SQUARES>& indBuf, Masks& masks) {
    uint64_t knights = board->getPieceSet(Board::knights, color);
-   knights &= ~masks[Board::pinned];
+   knights &= ~masks.pinned;
 
    uint64_t numKnights = Board::serializeBitboard(knights, indBuf);
    for(int i = 0; i < numKnights; ++i) {
       uint16_t square = indBuf[i];
-      uint64_t psuedoLegal = Tables::knightMoveTable[square];
+      uint64_t psuedoLegal = Tables::knightMoves(square);
       
-      uint64_t legal = psuedoLegal & masks[Board::targetMask];
-      if(legal) serializeMoves<color, MoveType::knight>(board, moveList, legal, square);
+      uint64_t legal = psuedoLegal & masks.targetMask;
+      if(legal) serializeMoves<color, MoveType::normal>(board, moveList, legal, square);
    }
 }
 
 template<Board::PieceColor color>
-void appendPawnMoves(Board* board, FixedVector<Move, MAX_LEGAL_MOVES>& moveList, std::array<uint16_t, NUM_SQUARES>& indBuf,
-      std::array<uint64_t, NUM_MASK_TYPES>& masks) 
-{
+void appendPawnMoves(Board* board, FixedVector<Move, MAX_LEGAL_MOVES>& moveList, std::array<uint16_t, NUM_SQUARES>& indBuf, Masks& masks) {
    constexpr Board::PieceColor oppColor = color == Board::white ? Board::black : Board::white;
    constexpr uint64_t pawnRank = color == Board::white ? RANK_2 : RANK_7;
-
-   constexpr Board::MaskTypes leftDiag = color == Board::white ? Board::antiMovable : Board::diagMovable;
-   constexpr Board::MaskTypes rightDiag = color == Board::white ? Board::diagMovable : Board::antiMovable;
 
    constexpr Board::Directions up = color == Board::white ? Board::north : Board::south;
    constexpr Board::Directions upRight = color == Board::white ? Board::northEast : Board::southEast;
@@ -169,18 +173,24 @@ void appendPawnMoves(Board* board, FixedVector<Move, MAX_LEGAL_MOVES>& moveList,
    constexpr int16_t downLeftOffset = color == Board::white ? southWestOffset : northWestOffset;
    constexpr int16_t downRightOffset = color == Board::white ? southEastOffset : northEastOffset;
 
+   uint64_t leftDiagMask, rightDiagMask;
+   if constexpr (color == Board::white)
+      leftDiagMask = masks.antiMovable, rightDiagMask = masks.diagMovable;
+   else
+      leftDiagMask = masks.diagMovable, rightDiagMask = masks.antiMovable;
+
    uint64_t pawns = board->getPieceSet(Board::pawns, color);
    uint64_t oppPieces = board->getPieceSet(Board::all, oppColor);
    uint64_t epAttackTarget = board->getEnPassantTarget(color);
    uint64_t empty = board->getEmpty();
-   uint64_t targetMask = masks[Board::pawnTargetMask]; 
+   uint64_t targetMask = masks.pawnTargetMask; 
 
-   uint64_t pushable = pawns & masks[Board::verMovable];
+   uint64_t pushable = pawns & masks.verMovable;
    uint64_t singlePushTargets = Board::shift<up>(pushable) & empty & targetMask;
    uint64_t doublePushTargets = Board::shift<up>(pushable & pawnRank) & empty;
    doublePushTargets = Board::shift<up>(doublePushTargets) & empty & targetMask;
-   uint64_t leftAttacks = Board::shift<upLeft>(pawns & masks[leftDiag]) & (oppPieces | epAttackTarget) & targetMask;
-   uint64_t rightAttacks = Board::shift<upRight>(pawns & masks[rightDiag]) & (oppPieces | epAttackTarget) & targetMask;
+   uint64_t leftAttacks = Board::shift<upLeft>(pawns & leftDiagMask) & (oppPieces | epAttackTarget) & targetMask;
+   uint64_t rightAttacks = Board::shift<upRight>(pawns & rightDiagMask) & (oppPieces | epAttackTarget) & targetMask;
    
    if(singlePushTargets & NOT_LAST_RANK) serializeMoves<color, MoveType::pawn>(board, moveList, singlePushTargets & NOT_LAST_RANK, downOffset);
    if(doublePushTargets) serializeMoves<color, MoveType::pawn>(board, moveList, doublePushTargets, downOffset*2);
@@ -193,12 +203,12 @@ void appendPawnMoves(Board* board, FixedVector<Move, MAX_LEGAL_MOVES>& moveList,
 }
 
 template<Board::PieceColor color>
-void appendKingMoves(Board* board, FixedVector<Move, MAX_LEGAL_MOVES>& moveList, std::array<uint64_t, NUM_MASK_TYPES>& masks) {
-   uint64_t targetMask = masks[Board::kingTargetMask];
+void appendKingMoves(Board* board, FixedVector<Move, MAX_LEGAL_MOVES>& moveList, Masks& masks) {
+   uint64_t targetMask = masks.kingTargetMask;
    uint64_t king = board->getPieceSet(Board::king, color);
    uint16_t kingSquare = Board::serializeSingleBit(king);
    
-   uint64_t targets = Tables::kingMoveTable[kingSquare] & targetMask;
+   uint64_t targets = Tables::kingMoves(kingSquare) & targetMask;
    if(targets) serializeMoves<color, MoveType::king>(board, moveList, targets, kingSquare);
 
    bool kingCastleRights = board->getKingCastleRights(color);
@@ -210,7 +220,7 @@ void appendKingMoves(Board* board, FixedVector<Move, MAX_LEGAL_MOVES>& moveList,
    uint64_t rooks = board->getPieceSet(Board::rooks, color);
    uint64_t occupied = board->getOccupied();
    uint64_t empty = board->getEmpty();
-   uint64_t notInCheck = masks[Board::notInCheck];
+   uint64_t notInCheck = masks.notInCheck;
 
    targetMask &= empty;
    uint64_t kingCastleMask = Board::fullBoolMask(kingCastleRights), queenCastleMask = Board::fullBoolMask(queenCastleRights);
@@ -234,7 +244,7 @@ void populatePinMasks(std::array<uint64_t, NUM_SQUARES>& pinMasks, std::array<ui
 
 //populates mask array
 template<Board::PieceColor color>
-void generateMasks(Board* board, std::array<uint64_t, NUM_MASK_TYPES>& masks, std::array<uint64_t, NUM_SQUARES>& pinMasks, std::array<uint16_t, NUM_SQUARES>& indBuf) {
+void generateMasks(Board* board, Masks& masks, std::array<uint64_t, NUM_SQUARES>& pinMasks, std::array<uint16_t, NUM_SQUARES>& indBuf) {
    constexpr Board::PieceColor oppColor = color == Board::white ? Board::black : Board::white;
    constexpr Board::Directions up = color == Board::white ? Board::north : Board::south;
 
@@ -285,10 +295,10 @@ void generateMasks(Board* board, std::array<uint64_t, NUM_MASK_TYPES>& masks, st
 
    uint64_t allInBetween = horInBetween | verInBetween | diagInBetween | antiInBetween;
 
-   masks[Board::verMovable] = ~(allInBetween ^ verInBetween);
-   masks[Board::diagMovable] = ~(allInBetween ^ diagInBetween);
-   masks[Board::antiMovable] = ~(allInBetween ^ antiInBetween);
-   masks[Board::pinned] = allInBetween;
+   masks.verMovable = ~(allInBetween ^ verInBetween);
+   masks.diagMovable = ~(allInBetween ^ diagInBetween);
+   masks.antiMovable = ~(allInBetween ^ antiInBetween);
+   masks.pinned = allInBetween;
 
    uint64_t kingSuperOrth = kingNorth | kingSouth | kingEast | kingWest;
    uint64_t kingSuperDiag = kingNorthEast | kingNorthWest | kingSouthEast | kingSouthWest;
@@ -298,39 +308,38 @@ void generateMasks(Board* board, std::array<uint64_t, NUM_MASK_TYPES>& masks, st
       oppPawnAttacks = Board::blackPawnTargets(oppPawns);
    else 
       oppPawnAttacks = Board::whitePawnTargets(oppPawns);
-   uint64_t pawnCheckFrom = Tables::pawnAttackTable[color][kingSquare] & oppPawns;
+   uint64_t pawnCheckFrom = Tables::pawnAttacks(color, kingSquare) & oppPawns;
 
    uint64_t oppAnyAttacks = oppPawnAttacks | oppSliderEast | oppSliderWest | oppSliderNorth | oppSliderSouth | oppSliderNorthEast | oppSliderSouthWest | oppSliderNorthWest 
          | oppSliderSouthEast | Board::knightAttackTargets(oppKnights) | Board::kingAttackTargets(oppKing);
 
    uint64_t blocks = allInBetween & empty;
    uint64_t checkFrom = (kingSuperOrth & oppRookLike) | (kingSuperDiag & oppBishopLike) 
-         | pawnCheckFrom | (Tables::knightMoveTable[kingSquare] & oppKnights);
+         | pawnCheckFrom | (Tables::knightMoves(kingSquare) & oppKnights);
 
    int64_t nullIfCheck = Board::nullBoolMask(oppAnyAttacks & king);
    int64_t nullIfDoubleCheck = Board::nullBoolMask(checkFrom & (checkFrom - 1));
    uint64_t checkTo = checkFrom | blocks | nullIfCheck;
-   uint64_t drawMask = Board::fullBoolMask(board->getHalfMoveClock() < 100);
 
-   masks[Board::targetMask] = ~pieces & checkTo & nullIfDoubleCheck & drawMask;
-   masks[Board::pawnTargetMask] = (masks[Board::targetMask] | (board->getEnPassantTarget(color) & Board::shift<up>(pawnCheckFrom))) & drawMask; //include en passant capture of pawn checker
-   masks[Board::kingTargetMask] = ~(pieces | oppAnyAttacks) & drawMask;
-   masks[Board::notInCheck] = nullIfCheck;
+   masks.targetMask = ~pieces & checkTo & nullIfDoubleCheck;
+   masks.pawnTargetMask = (masks.targetMask | (board->getEnPassantTarget(color) & Board::shift<up>(pawnCheckFrom))); //include en passant capture of pawn checker
+   masks.kingTargetMask = ~(pieces | oppAnyAttacks);
+   masks.notInCheck = nullIfCheck;
 }
 
 template<Board::PieceColor color>
 bool generate(Board* board, FixedVector<Move, MAX_LEGAL_MOVES>& moveList) {
+   Masks masks;
    std::array<uint16_t, NUM_SQUARES> indBuf;
-   std::array<uint64_t, NUM_MASK_TYPES> masks;
    std::array<uint64_t, NUM_SQUARES> pinMasks;
    generateMasks<color>(board, masks, pinMasks, indBuf);
 
-   appendSliderMoves<color>(board, moveList, indBuf, masks, pinMasks);
-   appendKnightMoves<color>(board, moveList, indBuf, masks);
    appendPawnMoves<color>(board, moveList, indBuf, masks);
+   appendKnightMoves<color>(board, moveList, indBuf, masks);
+   appendSliderMoves<color>(board, moveList, indBuf, pinMasks, masks);
    appendKingMoves<color>(board, moveList, masks);
 
-   return !masks[Board::notInCheck];
+   return !masks.notInCheck;
 }
 
 bool MoveGen::getLegalMoves(Board* board, Board::PieceColor color, FixedVector<Move, MAX_LEGAL_MOVES>& moveList) {

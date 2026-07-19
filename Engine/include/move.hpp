@@ -46,5 +46,5 @@ public:
 };
 
 enum class MoveType {
-    pawn, promotion, slider, knight, king
+    normal, pawn, promotion, king
 };
