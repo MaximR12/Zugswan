@@ -2,6 +2,7 @@
 
 #include <array>
 #include "board.hpp"
+#include "transposetable.hpp"
 
 constexpr int SEED = 1070372;
 
@@ -41,6 +42,8 @@ namespace Tables {
         std::array<uint64_t, FILES> epFiles;
         uint64_t blackSide; 
     } ZTable;
+
+    inline TranspositionTable TTable;
 
     void init();
 }
