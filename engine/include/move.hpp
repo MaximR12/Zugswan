@@ -35,6 +35,8 @@ public:
         m_move = ((flags&0xF)<<12) | ((to&0x3F)<<6) | (from&0x3F);
     }
 
+    bool operator==(const Move other) { return m_move == other.m_move; }
+
     uint16_t getFrom() const { return m_move&0x3F; }
     uint16_t getTo() const { return (m_move>>6)&0x3F; }
     uint16_t getFlag() const { return (m_move>>12)&0x0F; }

@@ -9,8 +9,9 @@ target_sources(Engine PRIVATE
   src/board.cpp
   src/tables.cpp
   src/search.cpp
-  tests/perft.cpp
+  src/transposetable.cpp
   src/uci.cpp
+  tests/perft.cpp
 )
 
 target_include_directories(Engine PUBLIC

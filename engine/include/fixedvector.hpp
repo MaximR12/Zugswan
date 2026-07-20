@@ -18,6 +18,7 @@ public:
     T* end() { return &m_data[m_size]; }
 
     void clear() { m_size = 0; }
+    void reorder(const T& elem);
     void push_vec(FixedVector<T, N>& vec, size_t pos); 
     void push_back() { assert(m_size < N); m_size++; }
     void push_back(const T& elem) { assert(m_size < N); m_data[m_size++] = elem; }
@@ -30,4 +31,16 @@ inline void FixedVector<T, N>::push_vec(FixedVector<T, N>& vec, size_t pos) {
     for(size_t i = pos; i < pos + vec.size(); ++i)
         m_data[i] = vec[i-pos];
     m_size = std::max(pos + vec.size(), m_size);
+}
+
+template<typename T, size_t N>
+inline void FixedVector<T, N>::reorder(const T& elem) {
+    for(size_t i = 0; i < m_size; ++i) {
+        if(m_data[i] == elem) {
+            T temp = m_data[0];
+            m_data[0] = elem;
+            m_data[i] = temp;
+            return;
+        }
+    }
 }

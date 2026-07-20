@@ -8,6 +8,12 @@ enum class SearchType {
     time, depth, nodes, movetime, infinite
 };
 
+struct SearchMetrics {
+    int nodes = 0;
+    int ttHits = 0;
+    int ttMisses = 0;
+};
+
 namespace Search {
     template<SearchType type>
     void Search(GameState* state, int depth=0); 

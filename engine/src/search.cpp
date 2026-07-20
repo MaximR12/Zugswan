@@ -2,6 +2,7 @@
 #include <chrono>
 #include <atomic>
 #include <thread>
+#include "transposetable.hpp"
 #include "search.hpp"
 #include "gamestate.hpp"
 
@@ -11,9 +12,11 @@ int evaluate(GameState* state) {
     return state->getTurn() == Board::white ? Board::materialBalance(state->getBoard()) : -Board::materialBalance(state->getBoard());
 }
 
-int alphaBeta(GameState* state, FixedVector<Move, MAX_SEARCH_DEPTH>& prevMoveLine, int alpha, int beta, int depth) {
+int alphaBeta(GameState* state, SearchMetrics& metrics, FixedVector<Move, MAX_SEARCH_DEPTH>& prevMoveLine, int alpha, int beta, int depth) {
     if(stopRequested.load(std::memory_order_relaxed))
         return 0;
+
+    ++metrics.nodes;
 
     if(depth == 0) 
         return evaluate(state);
@@ -24,19 +27,28 @@ int alphaBeta(GameState* state, FixedVector<Move, MAX_SEARCH_DEPTH>& prevMoveLin
     if(moveList.size() == 0) 
         return state->inCheck() ? -INT_MAX : 0;
 
+    uint64_t zobrist = state->getZobrist();
+    TransposeEntry* tEntry = Tables::TTable.probe(zobrist);
+    if(tEntry)
+        moveList.reorder(tEntry->best), ++metrics.ttHits;
+    else
+        ++metrics.ttMisses;
+
     FixedVector<Move, MAX_SEARCH_DEPTH> moveLine;
     for(Move move : moveList) {
         state->makeMove(move);
-        int score = -alphaBeta(state, moveLine, -beta, -alpha, depth-1);
+        int score = -alphaBeta(state, metrics, moveLine, -beta, -alpha, depth-1);
         state->unmakeMove(move);
 
         if(score >= beta) {
+            Tables::TTable.insert(zobrist, NodeType::pv, move, depth, score);
             prevMoveLine[0] = move;
             prevMoveLine.push_vec(moveLine, 1);
             return beta;
         }
         
         if(score > alpha) {
+            Tables::TTable.insert(zobrist, NodeType::pv, move, depth, score);
             alpha = score;
             prevMoveLine[0] = move;
             prevMoveLine.push_vec(moveLine, 1);
@@ -57,13 +69,14 @@ void iterativeDeepening(GameState* state, FixedVector<Move, MAX_SEARCH_DEPTH>& m
 
     int currPly = 1;
     do {
+        SearchMetrics metrics;
         FixedVector<Move, MAX_SEARCH_DEPTH> currMoveLine;
-        int score = alphaBeta(state, currMoveLine, -INT_MAX, INT_MAX, currPly++);
+        int score = alphaBeta(state, metrics, currMoveLine, -INT_MAX, INT_MAX, currPly++);
         
         if(!stopRequested)
             moveLine = currMoveLine;
 
-        std::cout << "info depth " << currPly-1 << " score cp " << score << " pv";
+        std::cout << "info depth " << currPly-1 << " score cp " << score << " nodes " << metrics.nodes << " pv";
         for(Move move : moveLine)
             std::cout << " " << Board::getMoveString(move);
         std::cout << std::endl;
@@ -77,7 +90,9 @@ void Search::Search(GameState* state, int depth) {
     
     if constexpr (type == SearchType::depth) {
         stopRequested = false;
-        alphaBeta(state, moveLine, -INT_MAX, INT_MAX, depth);
+        SearchMetrics metrics;
+        alphaBeta(state, metrics, moveLine, -INT_MAX, INT_MAX, depth);
+        std::cout << "nodes " << metrics.nodes << std::endl;
     } else if constexpr (type == SearchType::time) {
         stopRequested = false;
         iterativeDeepening(state, moveLine);

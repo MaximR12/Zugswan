@@ -52,6 +52,7 @@ public:
     void moveFromList(std::vector<std::string>& moveList);
 
     Board* getBoard() { return &m_board; }
+    uint64_t getZobrist() { return m_zobrist; }
 
     bool inCheck() const { return m_inCheck; }
 
