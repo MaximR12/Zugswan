@@ -11,7 +11,7 @@ enum class SearchType {
 struct SearchMetrics {
     int nodes = 0;
     int ttHits = 0;
-    int ttMisses = 0;
+    int ttTotal = 0;
 };
 
 namespace Search {

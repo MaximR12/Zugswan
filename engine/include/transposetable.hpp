@@ -5,14 +5,14 @@
 constexpr size_t DEFAULT_HASH_SIZE = 64 * 1024 * 1024; //64MB
 
 enum class NodeType : uint8_t {
-    pv, all, cut
+    exact, upper, lower
 };
 
 struct TransposeEntry {
     uint64_t zobrist;
     Move best;
+    int16_t score;
     uint8_t depth;
-    uint8_t score;
     NodeType type;
     bool used;
 };
@@ -31,10 +31,11 @@ private:
     Cluster m_table[TT_SIZE];
 
 public:
-    TranspositionTable();
+    TranspositionTable() { clear(); }
 
     TransposeEntry* probe(uint64_t zobrist);
-    void insert(uint64_t zobrist, NodeType type, Move best, uint8_t depth, uint8_t score);
+    void insert(uint64_t zobrist, NodeType type, Move best, uint8_t depth, int16_t score);
+    void clear();
 
     static size_t getIndex(uint64_t zobrist) { return zobrist&INDEX_MASK; }
 };

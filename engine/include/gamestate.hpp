@@ -54,6 +54,8 @@ public:
     Board* getBoard() { return &m_board; }
     uint64_t getZobrist() { return m_zobrist; }
 
+    uint16_t getHalfMoveClock() { return m_board.getHalfMoveClock(); }
+
     bool inCheck() const { return m_inCheck; }
 
     void updateLegalMoves() { m_legalMoves.clear(); MoveGen::getLegalMoves(&m_board, m_turn, m_legalMoves); }
