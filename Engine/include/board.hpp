@@ -211,7 +211,7 @@ public:
     static uint16_t bitScanReverse(uint64_t BB) { assert(BB != 0); return 63 - std::countl_zero(BB); }
     static uint16_t serializeSingleBit(uint64_t BB) { return bitScanForward(BB); } //get square indices from bitboards
     static uint16_t serializeBitboard(uint64_t BB, std::array<uint16_t, NUM_SQUARES>& indBuf); //serialize into indBuf and return size
-    static int materialBalance(Board* board); //positive for white material advantage, negative for black material advantage
+    static int16_t materialBalance(Board* board); //positive for white material advantage, negative for black material advantage
 
     static uint16_t getIndexSquare(std::string square);
     static std::string getIndexStr(uint16_t index);

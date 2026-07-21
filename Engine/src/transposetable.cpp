@@ -1,6 +1,6 @@
 #include "transposetable.hpp"
 
-TranspositionTable::TranspositionTable() {
+void TranspositionTable::clear() {
     for(size_t i = 0; i < TT_SIZE; ++i) {
         Cluster& cluster = m_table[i];
         for(int j = 0; j < CLUSTER_SIZE; ++j)
@@ -26,7 +26,7 @@ TransposeEntry* TranspositionTable::probe(uint64_t zobrist) {
     return nullptr;
 }
 
-void TranspositionTable::insert(uint64_t zobrist, NodeType type, Move best, uint8_t depth, uint8_t score) {
+void TranspositionTable::insert(uint64_t zobrist, NodeType type, Move best, uint8_t depth, int16_t score) {
     size_t index = TranspositionTable::getIndex(zobrist);
     assert(index < TT_SIZE);
 
@@ -59,8 +59,8 @@ void TranspositionTable::insert(uint64_t zobrist, NodeType type, Move best, uint
     entry = {
         .zobrist = zobrist,
         .best = best,
-        .depth = depth,
         .score = score,
+        .depth = depth,
         .type = type,
         .used = true
     };

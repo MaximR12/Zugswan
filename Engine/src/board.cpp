@@ -216,7 +216,7 @@ int materialCount(Board* board, Board::PieceColor side) {
     return material;
 }
 
-int Board::materialBalance(Board* board) {
+int16_t Board::materialBalance(Board* board) {
     return materialCount(board, white) - materialCount(board, black);
 }
 
