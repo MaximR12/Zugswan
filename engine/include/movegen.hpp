@@ -7,7 +7,7 @@
 #include <vector> 
 
 enum class GenType {
-    quiet, capture, evasion
+    quiet, capture
 };
 
 namespace MoveGen {
