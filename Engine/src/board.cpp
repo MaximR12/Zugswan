@@ -1,4 +1,5 @@
 #include "board.hpp"
+#include "tables.hpp"
 
 #include <unordered_map>
 #include <sstream>
@@ -38,6 +39,39 @@ uint64_t Board::knightAttackTargets(uint64_t squareSet) {
     attacks |= Board::shift<Board::north>(eastTwo|westTwo);
     attacks |= Board::shift<Board::south>(eastTwo|westTwo);
     return attacks;
+}
+
+uint64_t Board::getPositiveRayAttacks(uint16_t square, uint64_t occupied, Directions dir) {
+   uint64_t attacks = Tables::getRayMoves(square, dir);
+   uint64_t blocker = attacks & occupied;
+   if(blocker) {
+      square = Board::bitScanForward(blocker);
+      attacks ^= Tables::getRayMoves(square, dir);
+   }
+
+   return attacks; 
+}
+
+uint64_t Board::getNegativeRayAttacks(uint16_t square, uint64_t occupied, Directions dir) {
+   uint64_t attacks = Tables::getRayMoves(square, dir);
+   uint64_t blocker = attacks & occupied;
+   if(blocker) {
+      square = Board::bitScanReverse(blocker);
+      attacks ^= Tables::getRayMoves(square, dir);
+   }
+
+   return attacks; 
+}
+
+uint64_t Board::getRayAttacks(uint16_t square, uint64_t occupied, Directions dir) {
+   uint64_t attacks = Tables::getRayMoves(square, dir);
+   uint64_t blocker = attacks & occupied;
+   if(blocker) {
+      square = Board::bitScan(blocker, Board::isNegative(dir));
+      attacks ^= Tables::getRayMoves(square, dir);
+   }
+
+   return attacks; 
 }
 
 constinit const std::array<Board::PieceType, 4> promoTypeTable {

@@ -2,7 +2,6 @@
 #include <chrono>
 #include <atomic>
 #include <thread>
-#include <limits>
 #include "transposetable.hpp"
 #include "search.hpp"
 #include "gamestate.hpp"
@@ -11,6 +10,12 @@ std::atomic<bool> stopRequested = false;
 
 int16_t evaluate(GameState* state) {
     return state->getTurn() == Board::white ? Board::materialBalance(state->getBoard()) : -Board::materialBalance(state->getBoard());
+}
+
+void updatePV(FixedVector<Move, MAX_SEARCH_DEPTH>& prevMoveLine, FixedVector<Move, MAX_SEARCH_DEPTH>& moveLine, Move move) {
+    prevMoveLine.clear();
+    prevMoveLine.push_back(move);
+    prevMoveLine.push_vec(moveLine, 1);
 }
 
 int16_t alphaBeta(GameState* state, SearchMetrics& metrics, FixedVector<Move, MAX_SEARCH_DEPTH>& prevMoveLine, int16_t alpha, int16_t beta, int depth) {
@@ -26,10 +31,10 @@ int16_t alphaBeta(GameState* state, SearchMetrics& metrics, FixedVector<Move, MA
     state->getLegalMoves(moveList);
 
     if(moveList.size() == 0) //check mate / stalemate
-        return state->inCheck() ? -std::numeric_limits<int16_t>::max() : 0;
+        return state->inCheck() ? -VALUE_MATE : VALUE_DRAW;
 
-    if(state->getHalfMoveClock() >= 100) //check 50 move rule / three move repitition
-        return 0;
+    if(state->getHalfMoveClock() >= 100 || state->isRepetition()) //check 50 move rule / three move repitition
+        return VALUE_DRAW;
 
     FixedVector<Move, MAX_SEARCH_DEPTH> moveLine;
 
@@ -41,24 +46,19 @@ int16_t alphaBeta(GameState* state, SearchMetrics& metrics, FixedVector<Move, MA
         if(tEntry->depth >= depth) { //check if early cut off is possible
             switch(tEntry->type) {
                 case(NodeType::exact):
-                    prevMoveLine[0] = tEntry->best;
-                    prevMoveLine.push_vec(moveLine, 1);
+                    updatePV(prevMoveLine, moveLine, tEntry->best);
                     return tEntry->score;
                     
-                case(NodeType::upper):
-                    if(tEntry->score <= alpha) {
-                        prevMoveLine[0] = tEntry->best;
-                        prevMoveLine.push_vec(moveLine, 1);
+                case(NodeType::lower):
+                    if(tEntry->score >= beta) {
+                        updatePV(prevMoveLine, moveLine, tEntry->best);
                         return tEntry->score;
                     }
                     break;
-                
-                case(NodeType::lower):
-                    if(tEntry->score >= beta) {
-                        prevMoveLine[0] = tEntry->best;
-                        prevMoveLine.push_vec(moveLine, 1);
+
+                case(NodeType::upper):
+                    if(tEntry->score <= alpha)
                         return tEntry->score;
-                    }
                     break;
             }
         }
@@ -68,7 +68,7 @@ int16_t alphaBeta(GameState* state, SearchMetrics& metrics, FixedVector<Move, MA
     ++metrics.ttTotal;
 
     NodeType type = NodeType::upper;
-    int bestScore = -std::numeric_limits<int16_t>::max();
+    int16_t bestScore = -VALUE_MATE;
     Move bestMove = moveList[0];
 
     for(Move move : moveList) {
@@ -78,26 +78,22 @@ int16_t alphaBeta(GameState* state, SearchMetrics& metrics, FixedVector<Move, MA
 
         if(score > bestScore) {
             bestScore = score, bestMove = move;
-            prevMoveLine[0] = move;
-            prevMoveLine.push_vec(moveLine, 1);
 
             if(bestScore > alpha) {
                 alpha = bestScore;
                 type = NodeType::exact;
+                updatePV(prevMoveLine, moveLine, move);
             }
         }
 
         if(score >= beta) {
             Tables::TTable.insert(zobrist, NodeType::lower, move, depth, score);
-            prevMoveLine[0] = move;
-            prevMoveLine.push_vec(moveLine, 1);
             return bestScore;
         }
     }
 
     if(!stopRequested.load(std::memory_order_relaxed))
         Tables::TTable.insert(zobrist, type, bestMove, depth, bestScore);
-    
     return alpha;
 }
 
@@ -110,14 +106,14 @@ void iterativeDeepening(GameState* state, FixedVector<Move, MAX_SEARCH_DEPTH>& m
     });
     timer.detach();
 
-    int64_t score = 0;
+    int16_t score = 0;
     for(int ply = 1; ply < MAX_SEARCH_DEPTH; ++ply) {
-        if(score == -std::numeric_limits<int16_t>::max() || score == std::numeric_limits<int16_t>::max()) //exit early if forced mate
+        if(score == -VALUE_MATE || score == VALUE_MATE) //exit early if forced mate
             break;
 
         SearchMetrics metrics;
         FixedVector<Move, MAX_SEARCH_DEPTH> currMoveLine;
-        score = alphaBeta(state, metrics, currMoveLine, -std::numeric_limits<int16_t>::max(), std::numeric_limits<int16_t>::max(), ply);
+        score = alphaBeta(state, metrics, currMoveLine, -VALUE_MATE, VALUE_MATE, ply);
         
         if(stopRequested)
             break;
@@ -128,6 +124,12 @@ void iterativeDeepening(GameState* state, FixedVector<Move, MAX_SEARCH_DEPTH>& m
             std::cout << " " << Board::getMoveString(move);
         std::cout << std::endl;
     } 
+
+    if(moveLine.size() == 0) { //push default move
+        FixedVector<Move, MAX_LEGAL_MOVES> moveList;
+        state->getLegalMoves(moveList);
+        moveLine.push_back(moveList[0]);
+    }
 }
 
 template<SearchType type>
@@ -138,8 +140,11 @@ void Search::Search(GameState* state, int depth) {
     if constexpr (type == SearchType::depth) {
         stopRequested = false;
         SearchMetrics metrics;
-        alphaBeta(state, metrics, moveLine, -std::numeric_limits<int16_t>::max(), std::numeric_limits<int16_t>::max(), depth);
-        std::cout << "nodes " << metrics.nodes << std::endl;
+        int16_t score = alphaBeta(state, metrics, moveLine, -VALUE_MATE, VALUE_MATE, depth);
+        std::cout << "nodes " << metrics.nodes << " score cp " << score << " pv";
+        for(Move move : moveLine)
+            std::cout << " " << Board::getMoveString(move);
+        std::cout << std::endl;
     } else if constexpr (type == SearchType::time) {
         stopRequested = false;
         iterativeDeepening(state, moveLine);

@@ -2,7 +2,7 @@
 #include <unordered_map>
 #include <chrono>
 
-GameState::GameState() : m_turn{Board::white}, m_legalMoves{} { 
+GameState::GameState() : m_turn{Board::white} { 
     loadStartPos();
 }
 
@@ -53,6 +53,7 @@ void GameState::makeMove(Move move) {
         .oppEpTarget=m_board.getEnPassantTarget(Board::getOppositeColor(m_turn)),
         .captureType=Board::invalid,
         .halfMoveClock=m_board.getHalfMoveClock(),
+        .lastReversible=m_lastReversible,
         .kingCastleRights=m_board.getKingCastleRights(m_turn),
         .queenCastleRights=m_board.getQueenCastleRights(m_turn),
     });
@@ -73,6 +74,7 @@ void GameState::makeMove(Move move) {
         movePiece(fromType, fromColor, fromToBB, fromInd, toInd);
         updateOccupied(m_board, m_board.getOccupied() ^ fromToBB);
     } else {
+        setLastReversible();
         m_board.resetHalfMoveClock();
         Board::PieceType captureType = m_board.getPieceType(toInd);
         m_undoStack.back().captureType = captureType;
@@ -82,6 +84,7 @@ void GameState::makeMove(Move move) {
     }
 
     if(fromType == Board::pawns) {
+        setLastReversible();
         m_board.resetHalfMoveClock();
         if(flag == DOUBLE_PAWN_PUSH) {
             uint64_t epTarget, epCapturers;
@@ -128,6 +131,7 @@ void GameState::makeMove(Move move) {
             m_zobrist ^= Tables::ZTable.pieces[promoType][toInd];
         }
     } else if(flag == KING_CASTLE) {
+        setLastReversible();
         uint64_t rooks = m_board.getPieceSet(Board::rooks, fromColor);
         uint64_t kingRook = fromBB << 3;
         uint64_t rookFromToBB = kingRook | (kingRook >> 2);
@@ -136,6 +140,7 @@ void GameState::makeMove(Move move) {
         movePiece(Board::rooks, fromColor, rookFromToBB, from, to);
         updateOccupied(m_board, m_board.getOccupied() ^ rookFromToBB);
     } else if(flag == QUEEN_CASTLE) {
+        setLastReversible();
         uint64_t rooks = m_board.getPieceSet(Board::rooks, fromColor);
         uint64_t queenRook = fromBB >> 4;
         uint64_t rookFromToBB = queenRook | (queenRook << 3);
@@ -151,11 +156,10 @@ void GameState::makeMove(Move move) {
         m_zobrist ^= Tables::ZTable.epFiles[Board::getFile(epTarget)]; 
     }
 
-    m_board.incrementHalfMoveClock();
     switchTurn();
+    m_board.incrementPly();
+    m_hashList.push_back(m_zobrist);
 
-    // std::cout << GameState::getZobrist(&m_board, m_turn) << '\n';
-    // std::cout << Board::getMoveString(move) << '\n';
     assert(m_zobrist == GameState::getZobrist(&m_board, m_turn));
 }
 
@@ -239,17 +243,30 @@ void GameState::unmakeMove(Move move) {
     m_zobrist ^= Tables::ZTable.castleRights[m_board.getCastleRights()];
 
     m_board.updateHalfMoveClock(stateInfo.halfMoveClock);
+    m_lastReversible = stateInfo.lastReversible;
     
     m_undoStack.pop_back();
+    m_hashList.pop_back();
     switchTurn();
 
     assert(m_zobrist == GameState::getZobrist(&m_board, m_turn));
 }
 
+bool GameState::isRepetition() const {
+    int pos = (m_hashList.size()-1)%2 == (m_lastReversible%2) ? m_lastReversible+4 : m_lastReversible+5; //start 4 after the soonest turn after last reversible
+    for(pos; pos < m_hashList.size()-1; pos+=2) 
+        if(m_hashList.compare(pos, m_zobrist))
+            return true;
+    return false;
+}
+
 void GameState::loadPosition(std::string fen) {
     m_turn = m_board.loadPosition(fen);
     m_zobrist = GameState::getZobrist(&m_board, m_turn);
+    m_lastReversible = 0;
     m_undoStack.clear();
+    m_hashList.clear();
+    m_hashList.push_back(m_zobrist);
     updateLegalMoves();
 }
 

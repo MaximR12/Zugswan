@@ -12,10 +12,11 @@ private:
 public:
     FixedVector<T, N>() : m_size{0} { };
 
-    size_t size() { return m_size; }
+    size_t size() const { return m_size; }
     T& back() { return m_data[m_size-1]; }
     T* begin() { return m_data.data(); }
     T* end() { return &m_data[m_size]; }
+    bool compare(size_t i, const T& other) const { return m_data[i] == other; }
 
     void clear() { m_size = 0; }
     void reorder(const T& elem);

@@ -2,6 +2,10 @@
 #include <unordered_map>
 #include "movegen.hpp"
 
+enum class FlagType {
+   normal, pawn, promotion, king
+};
+
 struct Masks {
    uint64_t pinned;
    uint64_t verMovable;
@@ -13,40 +17,12 @@ struct Masks {
    uint64_t notInCheck;
 };
 
-uint64_t getPositiveRayAttacks(uint16_t square, uint64_t occupied, Board::Directions dir) {
-   uint64_t attacks = Tables::getRayMoves(square, dir);
-   uint64_t blocker = attacks & occupied;
-   if(blocker) {
-      square = Board::bitScanForward(blocker);
-      attacks ^= Tables::getRayMoves(square, dir);
-   }
+template<Board::PieceColor color, FlagType type>
+uint16_t scoreMove(Board* board, uint16_t from, uint16_t to) {
 
-   return attacks; 
 }
 
-uint64_t getNegativeRayAttacks(uint16_t square, uint64_t occupied, Board::Directions dir) {
-   uint64_t attacks = Tables::getRayMoves(square, dir);
-   uint64_t blocker = attacks & occupied;
-   if(blocker) {
-      square = Board::bitScanReverse(blocker);
-      attacks ^= Tables::getRayMoves(square, dir);
-   }
-
-   return attacks; 
-}
-
-uint64_t getRayAttacks(uint16_t square, uint64_t occupied, Board::Directions dir) {
-   uint64_t attacks = Tables::getRayMoves(square, dir);
-   uint64_t blocker = attacks & occupied;
-   if(blocker) {
-      square = Board::bitScan(blocker, Board::isNegative(dir));
-      attacks ^= Tables::getRayMoves(square, dir);
-   }
-
-   return attacks; 
-}
-
-template<Board::PieceColor color, MoveType type>
+template<Board::PieceColor color, FlagType type>
 uint16_t getFlag(Board* board, uint16_t from, uint16_t to) {
    constexpr Board::PieceColor oppColor = color == Board::white ? Board::black : Board::white;
 
@@ -57,7 +33,7 @@ uint16_t getFlag(Board* board, uint16_t from, uint16_t to) {
    int64_t captureMask = Board::fullBoolMask(toBB & oppPieces);
    flag |= CAPTURE & captureMask;
 
-   if constexpr (type == MoveType::pawn) {
+   if constexpr (type == FlagType::pawn) {
       uint64_t pawns = board->getPieceSet(Board::pawns, color);
       uint64_t epTargets = board->getEnPassantTarget(color);
       uint64_t fromIfPawn = fromBB & pawns;
@@ -68,7 +44,7 @@ uint16_t getFlag(Board* board, uint16_t from, uint16_t to) {
       flag |= EP_CAPTURE & Board::fullBoolMask(toBB & epTargets) & pawnMask;
    }
    
-   if constexpr (type == MoveType::king) {
+   if constexpr (type == FlagType::king) {
       uint64_t king = board->getPieceSet(Board::king, color);
 
       uint64_t nonZeroIfKingCastle = (toBB >> 2) & king & fromBB;
@@ -80,11 +56,11 @@ uint16_t getFlag(Board* board, uint16_t from, uint16_t to) {
    return flag;
 }
 
-template<Board::PieceColor color, MoveType type>
+template<Board::PieceColor color, FlagType type>
 void serializeMoves(Board* board, FixedVector<Move, MAX_LEGAL_MOVES>& moveList, uint64_t targets, int16_t from) 
 {
    int16_t fromOffset;
-   if constexpr (type == MoveType::pawn || type == MoveType::promotion)
+   if constexpr (type == FlagType::pawn || type == FlagType::promotion)
       fromOffset = from; //from acts as offset for pawn moves
 
    uint64_t occupied = board->getOccupied();
@@ -93,11 +69,11 @@ void serializeMoves(Board* board, FixedVector<Move, MAX_LEGAL_MOVES>& moveList, 
 
    for(int i = 0; i < len; ++i) {
       uint16_t to = indices[i];
-      if constexpr (type == MoveType::pawn || type == MoveType::promotion) 
+      if constexpr (type == FlagType::pawn || type == FlagType::promotion) 
          from = to + fromOffset; 
       uint16_t flag = getFlag<color, type>(board, from, to);
 
-      if constexpr (type != MoveType::promotion)
+      if constexpr (type != FlagType::promotion)
          moveList.push_back(Move(flag, from, to));
       else {
          moveList.push_back(Move(KNIGHT_PROMOTION | flag, from, to));
@@ -127,7 +103,7 @@ void appendSliderMoves(Board* board, FixedVector<Move, MAX_LEGAL_MOVES>& moveLis
          pinMask = pinMasks[square];
 
       uint64_t legal = psuedoLegal & pinMask & masks.targetMask;
-      if(legal) serializeMoves<color, MoveType::normal>(board, moveList, legal, square);
+      if(legal) serializeMoves<color, FlagType::normal>(board, moveList, legal, square);
    }
 
    uint16_t numBishopLike = Board::serializeBitboard(bishopLike, indBuf);
@@ -141,7 +117,7 @@ void appendSliderMoves(Board* board, FixedVector<Move, MAX_LEGAL_MOVES>& moveLis
          pinMask = pinMasks[square];
       
       uint64_t legal = psuedoLegal & pinMask & masks.targetMask;
-      if(legal) serializeMoves<color, MoveType::normal>(board, moveList, legal, square);
+      if(legal) serializeMoves<color, FlagType::normal>(board, moveList, legal, square);
    }
 }
 
@@ -156,7 +132,7 @@ void appendKnightMoves(Board* board, FixedVector<Move, MAX_LEGAL_MOVES>& moveLis
       uint64_t psuedoLegal = Tables::knightMoves(square);
       
       uint64_t legal = psuedoLegal & masks.targetMask;
-      if(legal) serializeMoves<color, MoveType::normal>(board, moveList, legal, square);
+      if(legal) serializeMoves<color, FlagType::normal>(board, moveList, legal, square);
    }
 }
 
@@ -192,14 +168,14 @@ void appendPawnMoves(Board* board, FixedVector<Move, MAX_LEGAL_MOVES>& moveList,
    uint64_t leftAttacks = Board::shift<upLeft>(pawns & leftDiagMask) & (oppPieces | epAttackTarget) & targetMask;
    uint64_t rightAttacks = Board::shift<upRight>(pawns & rightDiagMask) & (oppPieces | epAttackTarget) & targetMask;
    
-   if(singlePushTargets & NOT_LAST_RANK) serializeMoves<color, MoveType::pawn>(board, moveList, singlePushTargets & NOT_LAST_RANK, downOffset);
-   if(doublePushTargets) serializeMoves<color, MoveType::pawn>(board, moveList, doublePushTargets, downOffset*2);
-   if(rightAttacks & NOT_LAST_RANK) serializeMoves<color, MoveType::pawn>(board, moveList, rightAttacks & NOT_LAST_RANK, downLeftOffset);
-   if(leftAttacks & NOT_LAST_RANK) serializeMoves<color, MoveType::pawn>(board, moveList, leftAttacks & NOT_LAST_RANK, downRightOffset);
+   if(singlePushTargets & NOT_LAST_RANK) serializeMoves<color, FlagType::pawn>(board, moveList, singlePushTargets & NOT_LAST_RANK, downOffset);
+   if(doublePushTargets) serializeMoves<color, FlagType::pawn>(board, moveList, doublePushTargets, downOffset*2);
+   if(rightAttacks & NOT_LAST_RANK) serializeMoves<color, FlagType::pawn>(board, moveList, rightAttacks & NOT_LAST_RANK, downLeftOffset);
+   if(leftAttacks & NOT_LAST_RANK) serializeMoves<color, FlagType::pawn>(board, moveList, leftAttacks & NOT_LAST_RANK, downRightOffset);
 
-   if(singlePushTargets & LAST_RANK) serializeMoves<color, MoveType::promotion>(board, moveList, singlePushTargets & LAST_RANK, downOffset);
-   if(rightAttacks & LAST_RANK) serializeMoves<color, MoveType::promotion>(board, moveList, rightAttacks & LAST_RANK, downLeftOffset);
-   if(leftAttacks & LAST_RANK) serializeMoves<color, MoveType::promotion>(board, moveList, leftAttacks & LAST_RANK, downRightOffset);
+   if(singlePushTargets & LAST_RANK) serializeMoves<color, FlagType::promotion>(board, moveList, singlePushTargets & LAST_RANK, downOffset);
+   if(rightAttacks & LAST_RANK) serializeMoves<color, FlagType::promotion>(board, moveList, rightAttacks & LAST_RANK, downLeftOffset);
+   if(leftAttacks & LAST_RANK) serializeMoves<color, FlagType::promotion>(board, moveList, leftAttacks & LAST_RANK, downRightOffset);
 }
 
 template<Board::PieceColor color>
@@ -209,7 +185,7 @@ void appendKingMoves(Board* board, FixedVector<Move, MAX_LEGAL_MOVES>& moveList,
    uint16_t kingSquare = Board::serializeSingleBit(king);
    
    uint64_t targets = Tables::kingMoves(kingSquare) & targetMask;
-   if(targets) serializeMoves<color, MoveType::king>(board, moveList, targets, kingSquare);
+   if(targets) serializeMoves<color, FlagType::king>(board, moveList, targets, kingSquare);
 
    bool kingCastleRights = board->getKingCastleRights(color);
    bool queenCastleRights = board->getQueenCastleRights(color);
@@ -231,7 +207,7 @@ void appendKingMoves(Board* board, FixedVector<Move, MAX_LEGAL_MOVES>& moveList,
    uint64_t rightCastle = westTwo & Board::nullBoolMask(Board::shift<Board::west>(westTwo) & occupied) & queenCastleMask & Board::fullBoolMask((king >> 4) & rooks) & notInCheck; //queen castle includes occupency check of square west of queen rook
 
    uint64_t castleTargets = leftCastle | rightCastle;
-   if(castleTargets) serializeMoves<color, MoveType::king>(board, moveList, castleTargets, kingSquare);
+   if(castleTargets) serializeMoves<color, FlagType::king>(board, moveList, castleTargets, kingSquare);
 }
 
 void populatePinMasks(std::array<uint64_t, NUM_SQUARES>& pinMasks, std::array<uint16_t, NUM_SQUARES>& indBuf, Board::SliderRays dir, uint64_t inBetween) {
@@ -268,14 +244,14 @@ void generateMasks(Board* board, Masks& masks, std::array<uint64_t, NUM_SQUARES>
    uint64_t oppSliderSouthEast = Board::southEastFill(oppBishopLike, empty | king);
    uint64_t oppSliderSouthWest = Board::southWestFill(oppBishopLike, empty | king);
 
-   uint64_t kingNorth = getPositiveRayAttacks(kingSquare, occupied, Board::north);
-   uint64_t kingSouth = getNegativeRayAttacks(kingSquare, occupied, Board::south);
-   uint64_t kingEast = getPositiveRayAttacks(kingSquare, occupied, Board::east);
-   uint64_t kingWest = getNegativeRayAttacks(kingSquare, occupied, Board::west);
-   uint64_t kingNorthEast = getPositiveRayAttacks(kingSquare, occupied, Board::northEast);
-   uint64_t kingSouthWest = getNegativeRayAttacks(kingSquare, occupied, Board::southWest);
-   uint64_t kingNorthWest = getPositiveRayAttacks(kingSquare, occupied, Board::northWest);
-   uint64_t kingSouthEast = getNegativeRayAttacks(kingSquare, occupied, Board::southEast);
+   uint64_t kingNorth = Board::getPositiveRayAttacks(kingSquare, occupied, Board::north);
+   uint64_t kingSouth = Board::getNegativeRayAttacks(kingSquare, occupied, Board::south);
+   uint64_t kingEast = Board::getPositiveRayAttacks(kingSquare, occupied, Board::east);
+   uint64_t kingWest = Board::getNegativeRayAttacks(kingSquare, occupied, Board::west);
+   uint64_t kingNorthEast = Board::getPositiveRayAttacks(kingSquare, occupied, Board::northEast);
+   uint64_t kingSouthWest = Board::getNegativeRayAttacks(kingSquare, occupied, Board::southWest);
+   uint64_t kingNorthWest = Board::getPositiveRayAttacks(kingSquare, occupied, Board::northWest);
+   uint64_t kingSouthEast = Board::getNegativeRayAttacks(kingSquare, occupied, Board::southEast);
    
    uint64_t verInBetween = oppSliderNorth & kingSouth;
    verInBetween |= oppSliderSouth & kingNorth;

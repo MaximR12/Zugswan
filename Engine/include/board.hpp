@@ -85,7 +85,6 @@ constexpr int ROW_LEN = 8;
 
 class Board {
 private:
-    uint64_t zobrist;
     std::array<std::array<uint64_t, NUM_PIECE_TYPES>, 2> m_pieceBB;
     std::array<uint64_t, 2> m_enPassantTargets;
     uint64_t m_emptyBB;
@@ -149,7 +148,7 @@ public:
     void updateKingCastleRights(PieceColor color, bool castleRights) { m_kingCastleRights[color] = castleRights; }
     void updateQueenCastleRights(PieceColor color, bool castleRights) { m_queenCastleRights[color] = castleRights; }
     void updateHalfMoveClock(uint16_t halfMoveClock) { m_halfMoveClock = halfMoveClock; }
-    void incrementHalfMoveClock() { ++m_halfMoveClock; }
+    void incrementPly() { ++m_halfMoveClock; ++m_fullMoveCounter; }
     void resetHalfMoveClock() { m_halfMoveClock = 0; }
     void updateOccupiedBB(uint64_t BB) { m_occupiedBB = BB; }
     void updateEmptyBB(uint64_t BB) { m_emptyBB = BB; }
@@ -161,6 +160,9 @@ public:
     static uint64_t kingAttackTargets(uint64_t BB);
     static uint64_t whitePawnTargets(uint64_t BB);
     static uint64_t blackPawnTargets(uint64_t BB);
+    static uint64_t getPositiveRayAttacks(uint16_t square, uint64_t occupied, Directions dir);
+    static uint64_t getNegativeRayAttacks(uint16_t square, uint64_t occupied, Directions dir);
+    static uint64_t getRayAttacks(uint16_t square, uint64_t occupied, Directions dir);
 
     static int64_t fullBoolMask(bool cond) { return 0ULL - static_cast<uint64_t>(cond); }
     static int64_t fullBoolMask(uint64_t BB) { return 0ULL - static_cast<uint64_t>(BB != 0); }

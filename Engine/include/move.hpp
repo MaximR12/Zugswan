@@ -27,6 +27,7 @@ constexpr uint16_t QUEEN_PROMO_CAPTURE = 0xF;
 
 class Move {
 private:
+    uint16_t m_score;
     uint16_t m_move;
 
 public:
@@ -45,8 +46,4 @@ public:
     bool isPromotion() const { return getFlag()&0x8; }
 
     static bool isPromotion(uint16_t flag) { return flag&0x8; }
-};
-
-enum class MoveType {
-    normal, pawn, promotion, king
 };
