@@ -27,17 +27,23 @@ int16_t alphaBeta(GameState* state, SearchMetrics& metrics, FixedVector<Move, MA
     if(depth == 0) 
         return evaluate(state);
 
-    FixedVector<Move, MAX_LEGAL_MOVES> moveList;
+    MoveList moveList;
     state->getLegalMoves(moveList);
 
-    if(moveList.size() == 0) //check mate / stalemate
+    if(moveList.size() == 0) { //check mate / stalemate
+        prevMoveLine.clear();
         return state->inCheck() ? -VALUE_MATE : VALUE_DRAW;
+    }
 
-    if(state->getHalfMoveClock() >= 100 || state->isRepetition()) //check 50 move rule / three move repitition
+    if(state->getHalfMoveClock() >= 100 || state->isRepetition()) { //check 50 move rule / three move repitition
+        if(VALUE_DRAW < beta)
+            prevMoveLine.clear();
         return VALUE_DRAW;
+    }
 
     FixedVector<Move, MAX_SEARCH_DEPTH> moveLine;
 
+    Move move;
     uint64_t zobrist = state->getZobrist();
     TransposeEntry* tEntry = Tables::TTable.probe(zobrist);
     if(tEntry) {
@@ -50,10 +56,8 @@ int16_t alphaBeta(GameState* state, SearchMetrics& metrics, FixedVector<Move, MA
                     return tEntry->score;
                     
                 case(NodeType::lower):
-                    if(tEntry->score >= beta) {
-                        updatePV(prevMoveLine, moveLine, tEntry->best);
+                    if(tEntry->score >= beta)
                         return tEntry->score;
-                    }
                     break;
 
                 case(NodeType::upper):
@@ -63,15 +67,16 @@ int16_t alphaBeta(GameState* state, SearchMetrics& metrics, FixedVector<Move, MA
             }
         }
 
-        moveList.reorder(tEntry->best); //if no early cut off is possible, reorder the previous found best move to front of move list
-    }
+        move = moveList.pop_move(tEntry->best); //search tt move first
+    } else 
+        move = moveList.pick_move();
     ++metrics.ttTotal;
 
     NodeType type = NodeType::upper;
-    int16_t bestScore = -VALUE_MATE;
+    int16_t bestScore = -VALUE_INFINITE;
     Move bestMove = moveList[0];
 
-    for(Move move : moveList) {
+    while(move != Move::invalid()) { 
         state->makeMove(move);
         int16_t score = -alphaBeta(state, metrics, moveLine, -beta, -alpha, depth-1);
         state->unmakeMove(move);
@@ -90,7 +95,9 @@ int16_t alphaBeta(GameState* state, SearchMetrics& metrics, FixedVector<Move, MA
             Tables::TTable.insert(zobrist, NodeType::lower, move, depth, score);
             return bestScore;
         }
-    }
+
+        move = moveList.pick_move();
+    } 
 
     if(!stopRequested.load(std::memory_order_relaxed))
         Tables::TTable.insert(zobrist, type, bestMove, depth, bestScore);
@@ -113,7 +120,7 @@ void iterativeDeepening(GameState* state, FixedVector<Move, MAX_SEARCH_DEPTH>& m
 
         SearchMetrics metrics;
         FixedVector<Move, MAX_SEARCH_DEPTH> currMoveLine;
-        score = alphaBeta(state, metrics, currMoveLine, -VALUE_MATE, VALUE_MATE, ply);
+        score = alphaBeta(state, metrics, currMoveLine, -VALUE_INFINITE, VALUE_INFINITE, ply);
         
         if(stopRequested)
             break;
@@ -126,7 +133,7 @@ void iterativeDeepening(GameState* state, FixedVector<Move, MAX_SEARCH_DEPTH>& m
     } 
 
     if(moveLine.size() == 0) { //push default move
-        FixedVector<Move, MAX_LEGAL_MOVES> moveList;
+        MoveList moveList;
         state->getLegalMoves(moveList);
         moveLine.push_back(moveList[0]);
     }
@@ -140,7 +147,7 @@ void Search::Search(GameState* state, int depth) {
     if constexpr (type == SearchType::depth) {
         stopRequested = false;
         SearchMetrics metrics;
-        int16_t score = alphaBeta(state, metrics, moveLine, -VALUE_MATE, VALUE_MATE, depth);
+        int16_t score = alphaBeta(state, metrics, moveLine, -VALUE_INFINITE, VALUE_INFINITE, depth);
         std::cout << "nodes " << metrics.nodes << " score cp " << score << " pv";
         for(Move move : moveLine)
             std::cout << " " << Board::getMoveString(move);
@@ -152,7 +159,6 @@ void Search::Search(GameState* state, int depth) {
 
     std::cout << "bestmove " << Board::getMoveString(moveLine[0]);
     if(moveLine.size() > 1)
-        std::cout << " ponder " << Board::getMoveString(moveLine[1]) << std::endl;
-    else 
-        std::cout << std::endl; 
+        std::cout << " ponder " << Board::getMoveString(moveLine[1]);
+    std::cout << std::endl;
 }

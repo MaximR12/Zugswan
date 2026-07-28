@@ -73,7 +73,6 @@ constexpr int16_t southEastEastOffset = -6;
 constexpr int16_t southSouthWestOffset = -17;
 constexpr int16_t southWestWestOffset = -10;
 
-constexpr int MAX_LEGAL_MOVES = 256;
 constexpr int NUM_PIECE_TYPES = 8;
 constexpr int NUM_SQUARES = 64;
 constexpr int NUM_TOTAL_DIRECTIONS = 16; //slider + knight directions
@@ -141,7 +140,8 @@ public:
     uint64_t getEmpty() const { return m_emptyBB; }
     uint16_t getHalfMoveClock() const { return m_halfMoveClock; }
     PieceColor getPieceColor(uint16_t ind) const { assert(ind >= 0 && ind < NUM_SQUARES); return m_pieceBB[white][all]&(1ULL<<ind) ? white : black; }
-    PieceType getPieceType(uint16_t ind) const;
+    PieceType getPieceType(uint16_t ind, PieceColor color) const;
+    int16_t staticCaptureEvaluation(PieceType attacker, PieceColor oppColor, uint16_t to) { return getPieceValue(getPieceType(to, oppColor)) - getPieceValue(attacker); }
 
     void updateBB(PieceType type, PieceColor color, uint64_t BB) { m_pieceBB[color][type] = BB; }
     void updateEnPassantTargets(PieceColor color, uint64_t BB) { m_enPassantTargets[color] = BB; }
@@ -213,6 +213,8 @@ public:
     static uint16_t bitScanReverse(uint64_t BB) { assert(BB != 0); return 63 - std::countl_zero(BB); }
     static uint16_t serializeSingleBit(uint64_t BB) { return bitScanForward(BB); } //get square indices from bitboards
     static uint16_t serializeBitboard(uint64_t BB, std::array<uint16_t, NUM_SQUARES>& indBuf); //serialize into indBuf and return size
+    static int16_t getPieceValue(int type);
+    static int16_t getPieceValue(PieceType type);
     static int16_t materialBalance(Board* board); //positive for white material advantage, negative for black material advantage
 
     static uint16_t getIndexSquare(std::string square);

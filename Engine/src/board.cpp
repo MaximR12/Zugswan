@@ -210,12 +210,12 @@ int Board::getFile(uint64_t BB) {
     return -1;
 }
 
-Board::PieceType Board::getPieceType(uint16_t ind) const {
+Board::PieceType Board::getPieceType(uint16_t ind, PieceColor color) const {
     assert(ind >= 0 && ind < NUM_SQUARES); 
-    PieceColor color = this->getPieceColor(ind);
-    for(int curPieceSet = pawns; curPieceSet <= king; ++curPieceSet) { //loop over all piece types
-        if(m_pieceBB[color][curPieceSet]&(1ULL<<ind))
-            return static_cast<PieceType>(curPieceSet);
+    uint64_t BB = 1ULL<<ind;
+    for(int currPieceSet = pawns; currPieceSet <= king; ++currPieceSet) { //loop over all piece types
+        if(m_pieceBB[color][currPieceSet]&BB)
+            return static_cast<PieceType>(currPieceSet);
     }   
     return invalid;
 }
@@ -236,15 +236,23 @@ uint16_t Board::serializeBitboard(uint64_t BB, std::array<uint16_t, NUM_SQUARES>
     return count;
 }
 
-const std::unordered_map<int, int> valueMap {
+const std::unordered_map<int, int16_t> valueMap {
     {Board::pawns, 1}, {Board::knights, 3}, {Board::bishops, 3}, {Board::rooks, 5}, {Board::queens, 9}
 };
 
-int materialCount(Board* board, Board::PieceColor side) {
-    int material = 0;
+int16_t Board::getPieceValue(int type) {
+    return valueMap.at(type);
+}
+
+int16_t Board::getPieceValue(PieceType type) {
+    return valueMap.at(type);
+}
+
+int16_t materialCount(Board* board, Board::PieceColor side) {
+    int16_t material = 0;
     for(int type = Board::pawns; type < Board::king; ++type) {
-        int count = std::popcount(board->getPieceSet(static_cast<Board::PieceType>(type), side));
-        material += count * valueMap.at(type);
+        int16_t count = std::popcount(board->getPieceSet(static_cast<Board::PieceType>(type), side));
+        material += count * Board::getPieceValue(type);
     }
 
     return material;
