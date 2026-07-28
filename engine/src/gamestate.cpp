@@ -2,7 +2,7 @@
 #include <unordered_map>
 #include <chrono>
 
-GameState::GameState() : m_turn{Board::white} { 
+GameState::GameState() { 
     loadStartPos();
 }
 
@@ -65,7 +65,7 @@ void GameState::makeMove(Move move) {
 
     Board::PieceColor fromColor = m_turn;
     Board::PieceColor oppColor = Board::getOppositeColor(fromColor);
-    Board::PieceType fromType = m_board.getPieceType(fromInd);
+    Board::PieceType fromType = m_board.getPieceType(fromInd, fromColor);
 
     updateCastleRights(fromColor, oppColor, fromBB, toBB);
 
@@ -76,7 +76,7 @@ void GameState::makeMove(Move move) {
     } else {
         setLastReversible();
         m_board.resetHalfMoveClock();
-        Board::PieceType captureType = m_board.getPieceType(toInd);
+        Board::PieceType captureType = m_board.getPieceType(toInd, oppColor);
         m_undoStack.back().captureType = captureType;
         movePiece(fromType, fromColor, fromToBB, fromInd, toInd);
         removePiece(captureType, oppColor, toBB, toInd);
@@ -116,7 +116,7 @@ void GameState::makeMove(Move move) {
                 captureSquare = Board::shift<Board::south>(toBB);
             else
                 captureSquare = Board::shift<Board::north>(toBB);
-            Board::PieceType captureType = m_board.getPieceType(Board::serializeSingleBit(captureSquare));
+            Board::PieceType captureType = m_board.getPieceType(Board::serializeSingleBit(captureSquare), oppColor);
             m_undoStack.back().captureType = captureType;
 
             removePiece(captureType, oppColor, captureSquare, Board::serializeSingleBit(captureSquare));
@@ -159,6 +159,7 @@ void GameState::makeMove(Move move) {
     switchTurn();
     m_board.incrementPly();
     m_hashList.push_back(m_zobrist);
+    ++m_ply;
 
     assert(m_zobrist == GameState::getZobrist(&m_board, m_turn));
 }
@@ -174,7 +175,7 @@ void GameState::unmakeMove(Move move) {
 
     Board::PieceColor fromColor = Board::getOppositeColor(m_turn);
     Board::PieceColor oppColor = m_turn;
-    Board::PieceType fromType = m_board.getPieceType(toInd);
+    Board::PieceType fromType = m_board.getPieceType(toInd, fromColor);
 
     uint16_t flag = move.getFlag();
     if(!move.isPromotion()) {
@@ -248,15 +249,16 @@ void GameState::unmakeMove(Move move) {
     m_undoStack.pop_back();
     m_hashList.pop_back();
     switchTurn();
+    --m_ply;
 
     assert(m_zobrist == GameState::getZobrist(&m_board, m_turn));
 }
 
 bool GameState::isRepetition() const {
-    int pos = (m_hashList.size()-1)%2 == (m_lastReversible%2) ? m_lastReversible+4 : m_lastReversible+5; //start 4 after the soonest turn after last reversible
-    for(pos; pos < m_hashList.size()-1; pos+=2) 
-        if(m_hashList.compare(pos, m_zobrist))
+    for(int i = m_ply-2; i >= m_lastReversible+4; i-=2) { 
+        if(m_hashList.compare(i, m_zobrist))
             return true;
+    }
     return false;
 }
 
@@ -264,6 +266,7 @@ void GameState::loadPosition(std::string fen) {
     m_turn = m_board.loadPosition(fen);
     m_zobrist = GameState::getZobrist(&m_board, m_turn);
     m_lastReversible = 0;
+    m_ply = 0;
     m_undoStack.clear();
     m_hashList.clear();
     m_hashList.push_back(m_zobrist);

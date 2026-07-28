@@ -7,7 +7,7 @@
 #include "move.hpp"
 
 constexpr int UNDEFINED_SQUARE = 65;
-constexpr int MAX_GAME_LENGTH = 256;
+constexpr int MAX_GAME_LENGTH = 1024;
 
 struct StateInfo {
     uint64_t epTarget;
@@ -21,12 +21,13 @@ struct StateInfo {
 
 class GameState {
 private:
-    FixedVector<uint64_t, MAX_GAME_LENGTH> m_hashList; //store position hashes for detecting repetition
+    FixedVector<uint64_t, MAX_GAME_LENGTH> m_hashList;
     FixedVector<StateInfo, MAX_GAME_LENGTH> m_undoStack;
-    FixedVector<Move, MAX_LEGAL_MOVES> m_legalMoves;
+    MoveList m_legalMoves;
     
     uint64_t m_zobrist;
     uint16_t m_lastReversible;
+    uint16_t m_ply;
     Board m_board;
     Board::PieceColor m_turn;
     bool m_inCheck;
@@ -58,13 +59,13 @@ public:
     uint64_t getZobrist() { return m_zobrist; }
 
     uint16_t getHalfMoveClock() { return m_board.getHalfMoveClock(); }
-    void setLastReversible() { m_lastReversible = static_cast<uint16_t>(m_hashList.size()); }
+    void setLastReversible() { m_lastReversible = m_ply; }
 
     bool inCheck() const { return m_inCheck; }
     bool isRepetition() const;
 
     void updateLegalMoves() { m_legalMoves.clear(); MoveGen::getLegalMoves(&m_board, m_turn, m_legalMoves); }
-    void getLegalMoves(FixedVector<Move, MAX_LEGAL_MOVES>& moveList) { m_inCheck = MoveGen::getLegalMoves(&m_board, m_turn, moveList); };
+    void getLegalMoves(MoveList& moveList) { m_inCheck = MoveGen::getLegalMoves(&m_board, m_turn, moveList); };
 
     void updateTime(int wTime, int bTime, int wInc=0, int bInc=0) { m_whiteTime = wTime; m_whiteInc = wInc; m_blackTime = bTime; m_blackInc = bInc; }
     int getTime() { return m_turn == Board::white ? m_whiteTime : m_blackTime; }

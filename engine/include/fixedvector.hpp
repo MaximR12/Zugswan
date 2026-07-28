@@ -20,7 +20,7 @@ public:
 
     void clear() { m_size = 0; }
     void reorder(const T& elem);
-    void push_vec(FixedVector<T, N>& vec, size_t pos); 
+    void push_vec(FixedVector<T, N>& vec, size_t pos);
     void push_back() { assert(m_size < N); m_size++; }
     void push_back(const T& elem) { assert(m_size < N); m_data[m_size++] = elem; }
     void pop_back() { assert(m_size > 0); --m_size; }
