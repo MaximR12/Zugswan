@@ -20,6 +20,9 @@ public:
     }
 };
 
+constexpr size_t PIECE_TYPES = 6;
+constexpr size_t FILES = 8;
+
 namespace Tables {
     inline Random rand;
     inline bool initialized = false;
@@ -33,11 +36,8 @@ namespace Tables {
     uint64_t bishopAttacks(uint16_t square, uint64_t occupied);
     uint64_t rookAttacks(uint16_t square, uint64_t occupied);
 
-    constexpr size_t PIECE_TYPES = 6;
-    constexpr size_t FILES = 8;
-
     inline struct ZobristTable {
-        std::array<std::array<uint64_t, NUM_SQUARES>, PIECE_TYPES> pieces;
+        std::array<std::array<uint64_t, NUM_SQUARES>, PIECE_TYPES*2> pieces;
         std::array<uint64_t, Board::numCastleRights> castleRights;
         std::array<uint64_t, FILES> epFiles;
         uint64_t blackSide; 

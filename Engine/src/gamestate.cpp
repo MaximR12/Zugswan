@@ -31,20 +31,20 @@ void updateOccupied(Board& board, uint64_t occupied) {
 void GameState::movePiece(Board::PieceType type, Board::PieceColor color, uint64_t fromToBB, uint16_t from, uint16_t to) {
     m_board.updateBB(Board::all, color, m_board.getPieceSet(Board::all, color) ^ fromToBB);
     m_board.updateBB(type, color, m_board.getPieceSet(type, color) ^ fromToBB);
-    m_zobrist ^= Tables::ZTable.pieces[type][from];
-    m_zobrist ^= Tables::ZTable.pieces[type][to];
+    m_zobrist ^= Tables::ZTable.pieces[type+(color*PIECE_TYPES)][from];
+    m_zobrist ^= Tables::ZTable.pieces[type+(color*PIECE_TYPES)][to];
 }
 
 void GameState::removePiece(Board::PieceType type, Board::PieceColor color, uint64_t pieceBB, uint16_t square) {
     m_board.updateBB(Board::all, color, m_board.getPieceSet(Board::all, color) ^ pieceBB);
     m_board.updateBB(type, color, m_board.getPieceSet(type, color) ^ pieceBB);
-    m_zobrist ^= Tables::ZTable.pieces[type][square];
+    m_zobrist ^= Tables::ZTable.pieces[type+(color*PIECE_TYPES)][square];
 }
 
 void GameState::addPiece(Board::PieceType type, Board::PieceColor color, uint64_t pieceBB, uint16_t square) {
     m_board.updateBB(Board::all, color, m_board.getPieceSet(Board::all, color) | pieceBB);
     m_board.updateBB(type, color, m_board.getPieceSet(type, color) | pieceBB);
-    m_zobrist ^= Tables::ZTable.pieces[type][square];
+    m_zobrist ^= Tables::ZTable.pieces[type+(color*PIECE_TYPES)][square];
 }
 
 void GameState::makeMove(Move move) {
@@ -127,8 +127,8 @@ void GameState::makeMove(Move move) {
             uint64_t promoSet = m_board.getPieceSet(promoType, fromColor);
             m_board.updateBB(promoType, fromColor, promoSet | toBB);
 
-            m_zobrist ^= Tables::ZTable.pieces[Board::pawns][toInd];
-            m_zobrist ^= Tables::ZTable.pieces[promoType][toInd];
+            m_zobrist ^= Tables::ZTable.pieces[Board::pawns+(m_turn*PIECE_TYPES)][toInd];
+            m_zobrist ^= Tables::ZTable.pieces[promoType+(m_turn*PIECE_TYPES)][toInd];
         }
     } else if(flag == KING_CASTLE) {
         setLastReversible();
@@ -262,6 +262,38 @@ bool GameState::isRepetition() const {
     return false;
 }
 
+int16_t GameState::seeHelper(uint16_t sq) {
+    assert(sq);
+
+    int16_t score = 0;
+    uint16_t leastAttackerFrom = m_board.getLeastAttacker(sq, Board::getOppositeColor(m_turn));
+    
+    if(leastAttackerFrom) {
+        Board::PieceType captureType = m_board.getPieceType(sq, Board::getOppositeColor(m_turn));
+        Move captureMove = Move(CAPTURE, leastAttackerFrom, sq);
+        makeMove(captureMove);
+
+        int16_t gain = Board::getPieceValue(captureType) - seeHelper(sq);
+        score = std::max(score, gain);
+        unmakeMove(captureMove);
+    }
+
+    return score;
+}
+
+int16_t GameState::staticExchangeEvaluation(Move move) {
+    assert(move.isCapture());
+
+    uint16_t to = move.getTo();
+    int16_t capturePieceVal = Board::getPieceValue(m_board.getPieceType(to, Board::getOppositeColor(m_turn)));
+
+    makeMove(move);
+    int16_t score = capturePieceVal - seeHelper(to);
+    unmakeMove(move);
+    
+    return score;
+}
+
 void GameState::loadPosition(std::string fen) {
     m_turn = m_board.loadPosition(fen);
     m_zobrist = GameState::getZobrist(&m_board, m_turn);
@@ -301,12 +333,14 @@ void GameState::moveFromList(std::vector<std::string>& moveList) {
 uint64_t GameState::getZobrist(Board* board, Board::PieceColor turn) {
     uint64_t zobrist = 0;
     std::array<uint16_t, NUM_SQUARES> indBuf;
-    for(int type = Board::pawns; type <= Board::king; ++type) {
-        uint64_t currSet = board->getPieceSet(static_cast<Board::PieceType>(type), Board::white) | board->getPieceSet(static_cast<Board::PieceType>(type), Board::black); 
-        size_t size = Board::serializeBitboard(currSet, indBuf);
+    for(int color = Board::white; color <= Board::black; ++color) {
+        for(int type = Board::pawns; type <= Board::king; ++type) {
+            uint64_t currSet = board->getPieceSet(static_cast<Board::PieceType>(type), static_cast<Board::PieceColor>(color)); 
+            size_t size = Board::serializeBitboard(currSet, indBuf);
 
-        for(int i = 0; i < size; ++i) 
-            zobrist ^= Tables::ZTable.pieces[type][indBuf[i]];
+            for(int i = 0; i < size; ++i) 
+                zobrist ^= Tables::ZTable.pieces[type+(PIECE_TYPES*color)][indBuf[i]];
+        }
     }
 
     uint64_t epTarget = board->getEnPassantTarget(turn);

@@ -32,7 +32,7 @@ void Perft::run(GameState* game, int depth) {
             game->unmakeMove(moveList[i]);
 
             total += nodes;
-            std::cout << Board::getMoveString(moveList[i]) << ": " << nodes << " score: " << moveList[i].m_score << '\n';
+            std::cout << Board::getMoveString(moveList[i]) << ": " << nodes << '\n';
         }  
 
         std::cout << "\nNodes searched: " << total << '\n';

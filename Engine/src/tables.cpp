@@ -312,9 +312,10 @@ uint64_t Tables::rookAttacks(uint16_t square, uint64_t occupied) {
 }
 
 void initZobristTable() {
-    for(int type = Board::pawns; type <= Board::king; ++type)
-        for(int sq = 0; sq < 64; ++sq) 
-            ZTable.pieces[type][sq] = Tables::rand.getRand();
+    for(int color = Board::white; color <= Board::black; ++color)
+        for(int type = Board::pawns; type <= Board::king; ++type)
+            for(int sq = 0; sq < 64; ++sq) 
+                ZTable.pieces[type+(PIECE_TYPES*color)][sq] = Tables::rand.getRand();
 
     for(int i = 0; i < Board::numCastleRights; ++i)
         ZTable.castleRights[i] = Tables::rand.getRand();

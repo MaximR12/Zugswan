@@ -5,6 +5,27 @@
 #include <sstream>
 #include <format>
 
+uint64_t Board::attackTargets(uint16_t square, PieceType type, PieceColor color) const {
+    assert(square > 0 && square < NUM_SQUARES);
+    
+    switch (type) {
+        case(Board::pawns):
+            return color == Board::white ? whitePawnTargets(1ULL<<square) : blackPawnTargets(1ULL<<square);
+        case(Board::knights):
+            return knightAttackTargets(1ULL<<square);
+        case(Board::bishops):
+            return Tables::bishopAttacks(square, m_occupiedBB);
+        case(Board::rooks):
+            return Tables::rookAttacks(square, m_occupiedBB);
+        case(Board::queens):
+            return Tables::bishopAttacks(square, m_occupiedBB) | Tables::rookAttacks(square, m_occupiedBB);
+        case(Board::king):
+            return kingAttackTargets(1ULL<<square);
+        default:
+            return 0ULL;
+    }
+}
+
 uint64_t Board::whitePawnTargets(uint64_t wPawns) {
     uint64_t westAttacks = Board::shift<Board::northWest>(wPawns);
     uint64_t eastAttacks = Board::shift<Board::northEast>(wPawns); 
@@ -72,6 +93,18 @@ uint64_t Board::getRayAttacks(uint16_t square, uint64_t occupied, Directions dir
    }
 
    return attacks; 
+}
+
+uint16_t Board::getLeastAttacker(uint16_t square, PieceColor color) const {
+    Board::PieceColor oppColor = getOppositeColor(color);
+    for(int piece = Board::pawns; piece < Board::king; ++piece) {
+        Board::PieceType type = static_cast<PieceType>(piece);
+        uint64_t attackers = attackTargets(square, type, color) & getPieceSet(type, oppColor);
+        if(attackers)
+            return serializeSingleBit(attackers);
+    }
+
+    return 0ULL;
 }
 
 constinit const std::array<Board::PieceType, 4> promoTypeTable {
