@@ -94,11 +94,11 @@ private:
     std::array<bool, 2> m_queenCastleRights;
 
 public:
-    enum PieceColor {
+    enum PieceColor : uint8_t {
         white, black
     };
 
-    enum PieceType {
+    enum PieceType : uint8_t {
         pawns, knights, bishops, rooks, queens, king,
         all, invalid
     };
@@ -128,20 +128,21 @@ public:
         hor, ver, diag, anti
     };
 
-    Board() { }
+    Board() = default;
 
+    uint64_t getOccupied() const { return m_occupiedBB; }
+    uint64_t getEmpty() const { return m_emptyBB; }
     uint64_t getPieceSet(PieceType type, PieceColor color) const { return m_pieceBB[color][type]; }
     uint64_t getEnPassantTarget(PieceColor color) const { return m_enPassantTargets[color]; }
     uint8_t getCastleRights() const  
         { return (m_kingCastleRights[Board::white]<<0) | (m_queenCastleRights[Board::white]<<1) | (m_kingCastleRights[Board::black]<<2) | (m_queenCastleRights[Board::black]<<3); }
     bool getKingCastleRights(PieceColor color) const { return m_kingCastleRights[color]; }
     bool getQueenCastleRights(PieceColor color) const { return m_queenCastleRights[color]; }
-    uint64_t getOccupied() const { return m_occupiedBB; }
-    uint64_t getEmpty() const { return m_emptyBB; }
     uint16_t getHalfMoveClock() const { return m_halfMoveClock; }
     PieceColor getPieceColor(uint16_t ind) const { assert(ind >= 0 && ind < NUM_SQUARES); return m_pieceBB[white][all]&(1ULL<<ind) ? white : black; }
     PieceType getPieceType(uint16_t ind, PieceColor color) const;
-    int16_t staticCaptureEvaluation(PieceType attacker, PieceColor oppColor, uint16_t to) { return getPieceValue(getPieceType(to, oppColor)) - getPieceValue(attacker); }
+    uint64_t attackTargets(uint16_t square, PieceType type, PieceColor color) const;
+    uint16_t getLeastAttacker(uint16_t square, PieceColor color) const;
 
     void updateBB(PieceType type, PieceColor color, uint64_t BB) { m_pieceBB[color][type] = BB; }
     void updateEnPassantTargets(PieceColor color, uint64_t BB) { m_enPassantTargets[color] = BB; }
@@ -163,6 +164,7 @@ public:
     static uint64_t getPositiveRayAttacks(uint16_t square, uint64_t occupied, Directions dir);
     static uint64_t getNegativeRayAttacks(uint16_t square, uint64_t occupied, Directions dir);
     static uint64_t getRayAttacks(uint16_t square, uint64_t occupied, Directions dir);
+    int16_t staticCaptureEvaluation(PieceType attacker, PieceColor oppColor, uint16_t to) { return getPieceValue(getPieceType(to, oppColor)) - getPieceValue(attacker); }
 
     static int64_t fullBoolMask(bool cond) { return 0ULL - static_cast<uint64_t>(cond); }
     static int64_t fullBoolMask(uint64_t BB) { return 0ULL - static_cast<uint64_t>(BB != 0); }
@@ -206,6 +208,9 @@ public:
     static Directions getOppositeDirection(Directions dir);
     static PieceColor getOppositeColor(PieceColor color) { return static_cast<Board::PieceColor>((color + 1)%2); }
     static bool isNegative(Directions dir);
+    static int16_t getPieceValue(int type);
+    static int16_t getPieceValue(PieceType type);
+    static int16_t materialBalance(Board* board); //positive for white material advantage, negative for black material advantage
 
     static int getFile(uint64_t BB);
     static uint16_t bitScan(uint64_t BB, bool reverse);
@@ -213,9 +218,6 @@ public:
     static uint16_t bitScanReverse(uint64_t BB) { assert(BB != 0); return 63 - std::countl_zero(BB); }
     static uint16_t serializeSingleBit(uint64_t BB) { return bitScanForward(BB); } //get square indices from bitboards
     static uint16_t serializeBitboard(uint64_t BB, std::array<uint16_t, NUM_SQUARES>& indBuf); //serialize into indBuf and return size
-    static int16_t getPieceValue(int type);
-    static int16_t getPieceValue(PieceType type);
-    static int16_t materialBalance(Board* board); //positive for white material advantage, negative for black material advantage
 
     static uint16_t getIndexSquare(std::string square);
     static std::string getIndexStr(uint16_t index);

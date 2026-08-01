@@ -10,9 +10,11 @@ enum class GenType {
     quiet, capture
 };
 
+class GameState;
+
 namespace MoveGen {
 
     //return true if in check
-    bool getLegalMoves(Board* board, Board::PieceColor color, MoveList& moveList);
+    bool getLegalMoves(GameState& state, Board::PieceColor color, MoveList& moveList);
 
 }

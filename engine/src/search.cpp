@@ -12,6 +12,14 @@ int16_t evaluate(GameState* state) {
     return state->getTurn() == Board::white ? Board::materialBalance(state->getBoard()) : -Board::materialBalance(state->getBoard());
 }
 
+void startTimer(int timeMS) {
+    std::thread timer([timeMS]() {
+        std::this_thread::sleep_for(std::chrono::milliseconds(timeMS));
+        stopRequested.store(true, std::memory_order_relaxed);
+    });
+    timer.detach();
+}
+
 void updatePV(FixedVector<Move, MAX_SEARCH_DEPTH>& prevMoveLine, FixedVector<Move, MAX_SEARCH_DEPTH>& moveLine, Move move) {
     prevMoveLine.clear();
     prevMoveLine.push_back(move);
@@ -42,8 +50,8 @@ int16_t alphaBeta(GameState* state, SearchMetrics& metrics, FixedVector<Move, MA
     }
 
     FixedVector<Move, MAX_SEARCH_DEPTH> moveLine;
-
     Move move;
+    
     uint64_t zobrist = state->getZobrist();
     TransposeEntry* tEntry = Tables::TTable.probe(zobrist);
     if(tEntry) {
@@ -107,11 +115,7 @@ int16_t alphaBeta(GameState* state, SearchMetrics& metrics, FixedVector<Move, MA
 void iterativeDeepening(GameState* state, FixedVector<Move, MAX_SEARCH_DEPTH>& moveLine) {
     int base = state->getTime(), increment = state->getInc();
     int moveTime = GameState::getMoveTime(base, increment);
-    std::thread timer([moveTime]() {
-        std::this_thread::sleep_for(std::chrono::milliseconds(moveTime));
-        stopRequested.store(true, std::memory_order_relaxed);
-    });
-    timer.detach();
+    startTimer(moveTime);
 
     int16_t score = 0;
     for(int ply = 1; ply < MAX_SEARCH_DEPTH; ++ply) {
@@ -120,13 +124,17 @@ void iterativeDeepening(GameState* state, FixedVector<Move, MAX_SEARCH_DEPTH>& m
 
         SearchMetrics metrics;
         FixedVector<Move, MAX_SEARCH_DEPTH> currMoveLine;
+        auto start = std::chrono::high_resolution_clock::now();
         score = alphaBeta(state, metrics, currMoveLine, -VALUE_INFINITE, VALUE_INFINITE, ply);
-        
+        auto end = std::chrono::high_resolution_clock::now();
+        auto dur = std::chrono::duration<double>(end - start).count();
+        int nps = static_cast<int>(metrics.nodes / dur);
+
         if(stopRequested)
             break;
         
         moveLine = currMoveLine;
-        std::cout << "info depth " << ply << " score cp " << score << " nodes " << metrics.nodes << " pv";
+        std::cout << "info depth " << ply << " score cp " << score << " nodes " << metrics.nodes << " nps " << nps << " pv";
         for(Move move : moveLine)
             std::cout << " " << Board::getMoveString(move);
         std::cout << std::endl;
