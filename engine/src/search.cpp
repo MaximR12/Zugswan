@@ -2,6 +2,7 @@
 #include <chrono>
 #include <atomic>
 #include <thread>
+#include <algorithm>
 #include "transposetable.hpp"
 #include "search.hpp"
 #include "gamestate.hpp"
@@ -26,14 +27,85 @@ void updatePV(FixedVector<Move, MAX_SEARCH_DEPTH>& prevMoveLine, FixedVector<Mov
     prevMoveLine.push_vec(moveLine, 1);
 }
 
-int16_t alphaBeta(GameState* state, SearchMetrics& metrics, FixedVector<Move, MAX_SEARCH_DEPTH>& prevMoveLine, int16_t alpha, int16_t beta, int depth) {
+int16_t quiescenceSearch(GameState* state, SearchMetrics& metrics, int16_t alpha, int16_t beta) {
     if(stopRequested.load(std::memory_order_relaxed))
-        return 0;
-
+        return alpha;
+    
     ++metrics.nodes;
 
+    int16_t staticEval = evaluate(state);
+    int16_t bestScore = staticEval;
+    if(bestScore >= beta)
+        return bestScore;
+    if(bestScore > alpha)
+        alpha = bestScore;
+
+    MoveList moveList;
+    state->getLegalMoves(moveList);
+
+    if(moveList.size() == 0) //check mate / stalemate
+        return state->inCheck() ? -VALUE_MATE : VALUE_DRAW;
+
+    if(state->getHalfMoveClock() >= 100 || state->isRepetition()) //check 50 move rule / three move repitition
+        return VALUE_DRAW;
+
+    FixedVector<Move, MAX_SEARCH_DEPTH> moveLine;
+    Move move;
+    
+    uint64_t zobrist = state->getZobrist();
+    TransposeEntry* tEntry = Tables::TTable.probe(zobrist);
+    if(tEntry) {
+        ++metrics.ttHits;
+
+        switch(tEntry->type) {
+            case(NodeType::exact):
+                return tEntry->score;
+                
+            case(NodeType::lower):
+                if(tEntry->score >= beta)
+                    return tEntry->score;
+                break;
+
+            case(NodeType::upper):
+                if(tEntry->score <= alpha)
+                    return tEntry->score;
+                break;
+        }
+    }
+    ++metrics.ttTotal;
+    
+    move = moveList.pick_move();
+    while(move != Move::invalid()) {
+        if(!move.isCapture())
+            break;
+
+        state->makeMove(move);
+        int16_t score = -quiescenceSearch(state, metrics, -beta, -alpha);
+        state->unmakeMove(move);
+
+        if(score > bestScore) {
+            bestScore = score;
+            if(bestScore > alpha) 
+                alpha = bestScore;
+        }
+
+        if(score >= beta) 
+            return bestScore;
+
+        move = moveList.pick_move();
+    }
+
+    return bestScore;
+}
+
+int16_t alphaBeta(GameState* state, SearchMetrics& metrics, FixedVector<Move, MAX_SEARCH_DEPTH>& prevMoveLine, int16_t alpha, int16_t beta, int depth) {
+    if(stopRequested.load(std::memory_order_relaxed))
+        return alpha;
+
     if(depth == 0) 
-        return evaluate(state);
+        return quiescenceSearch(state, metrics, alpha, beta);
+
+    ++metrics.nodes;
 
     MoveList moveList;
     state->getLegalMoves(moveList);
@@ -82,7 +154,7 @@ int16_t alphaBeta(GameState* state, SearchMetrics& metrics, FixedVector<Move, MA
 
     NodeType type = NodeType::upper;
     int16_t bestScore = -VALUE_INFINITE;
-    Move bestMove = moveList[0];
+    Move bestMove = move;
 
     while(move != Move::invalid()) { 
         state->makeMove(move);
@@ -117,15 +189,33 @@ void iterativeDeepening(GameState* state, FixedVector<Move, MAX_SEARCH_DEPTH>& m
     int moveTime = GameState::getMoveTime(base, increment);
     startTimer(moveTime);
 
-    int16_t score = 0;
+    int16_t score = 0, alpha = -VALUE_INFINITE, beta = VALUE_INFINITE;
     for(int ply = 1; ply < MAX_SEARCH_DEPTH; ++ply) {
         if(score == -VALUE_MATE || score == VALUE_MATE) //exit early if forced mate
             break;
 
         SearchMetrics metrics;
         FixedVector<Move, MAX_SEARCH_DEPTH> currMoveLine;
+
         auto start = std::chrono::high_resolution_clock::now();
-        score = alphaBeta(state, metrics, currMoveLine, -VALUE_INFINITE, VALUE_INFINITE, ply);
+
+        int16_t delta = ASPIRATION_WIDTH / 2;
+        while(!stopRequested) {
+            assert(alpha >= -VALUE_INFINITE && beta <= VALUE_INFINITE);
+            score = alphaBeta(state, metrics, currMoveLine, alpha, beta, ply);
+        
+            if(score <= alpha) { //failed low
+                alpha = std::max(-VALUE_INFINITE, score - delta);
+                delta *= 2;
+            } else if(score >= beta) { //failed high
+                beta += std::min<int16_t>(VALUE_INFINITE, score + delta);
+                delta *= 2;
+            } else {
+                alpha = score - ASPIRATION_WIDTH / 2, beta = score + ASPIRATION_WIDTH / 2;
+                break;
+            }
+        }
+       
         auto end = std::chrono::high_resolution_clock::now();
         auto dur = std::chrono::duration<double>(end - start).count();
         int nps = static_cast<int>(metrics.nodes / dur);

@@ -9,6 +9,8 @@ constexpr int16_t VALUE_MATE = 30'000;
 constexpr int16_t VALUE_INFINITE = 30'001;
 constexpr int16_t VALUE_DRAW = 0;
 
+constexpr int16_t ASPIRATION_WIDTH = 200;
+
 enum class SearchType {
     time, depth, nodes, movetime, infinite
 };
