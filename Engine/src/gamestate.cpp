@@ -263,8 +263,6 @@ bool GameState::isRepetition() const {
 }
 
 int16_t GameState::seeHelper(uint16_t sq) {
-    assert(sq);
-
     int16_t score = 0;
     uint16_t leastAttackerFrom = m_board.getLeastAttacker(sq, Board::getOppositeColor(m_turn));
     
