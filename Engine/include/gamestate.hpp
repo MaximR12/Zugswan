@@ -25,6 +25,7 @@ private:
     FixedVector<StateInfo, MAX_GAME_LENGTH> m_undoStack;
     MoveList m_legalMoves;
     
+    std::array<int16_t, 2> m_pstScores;
     uint64_t m_zobrist;
     uint16_t m_lastReversible;
     uint16_t m_ply;
@@ -58,6 +59,7 @@ public:
 
     Board* getBoard() { return &m_board; }
     uint64_t getZobrist() { return m_zobrist; }
+    int16_t getPst(Board::PieceColor color) { return m_pstScores[color]; }
 
     uint16_t getHalfMoveClock() { return m_board.getHalfMoveClock(); }
     void setLastReversible() { m_lastReversible = m_ply; }
@@ -77,6 +79,7 @@ public:
     static uint16_t getRow(uint16_t sq) { return ROW_LEN - sq / ROW_LEN; }
     static uint16_t getCol(uint16_t sq) { return sq % ROW_LEN; }
 
-    static uint64_t getZobrist(Board* board, Board::PieceColor turn);
+    static uint64_t calculateZobrist(Board* board, Board::PieceColor turn);
+    static int16_t calculatePstScore(Board* board, Board::PieceColor turn);
     static int getMoveTime(int base, int increment) { return base / 20 + increment / 2; }
 };
