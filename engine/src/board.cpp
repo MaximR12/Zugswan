@@ -270,7 +270,7 @@ uint16_t Board::serializeBitboard(uint64_t BB, std::array<uint16_t, NUM_SQUARES>
 }
 
 const std::unordered_map<int, int16_t> valueMap {
-    {Board::pawns, 100}, {Board::knights, 300}, {Board::bishops, 300}, {Board::rooks, 500}, {Board::queens, 900}
+    {Board::pawns, 100}, {Board::knights, 320}, {Board::bishops, 330}, {Board::rooks, 500}, {Board::queens, 900}
 };
 
 int16_t Board::getPieceValue(int type) {

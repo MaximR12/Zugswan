@@ -3,15 +3,12 @@
 #include <atomic>
 #include <thread>
 #include <algorithm>
+#include "evaluate.hpp"
 #include "transposetable.hpp"
 #include "search.hpp"
 #include "gamestate.hpp"
 
 std::atomic<bool> stopRequested = false;
-
-int16_t evaluate(GameState* state) {
-    return state->getTurn() == Board::white ? Board::materialBalance(state->getBoard()) : -Board::materialBalance(state->getBoard());
-}
 
 void startTimer(int timeMS) {
     std::thread timer([timeMS]() {
@@ -33,7 +30,7 @@ int16_t quiescenceSearch(GameState* state, SearchMetrics& metrics, int16_t alpha
     
     ++metrics.nodes;
 
-    int16_t staticEval = evaluate(state);
+    int16_t staticEval = Eval::evaluate(state);
     int16_t bestScore = staticEval;
     if(bestScore >= beta)
         return bestScore;

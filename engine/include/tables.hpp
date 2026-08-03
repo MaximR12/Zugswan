@@ -36,6 +36,8 @@ namespace Tables {
     uint64_t bishopAttacks(uint16_t square, uint64_t occupied);
     uint64_t rookAttacks(uint16_t square, uint64_t occupied);
 
+    int16_t pstScore(Board::PieceColor side, Board::PieceType type, uint16_t square);
+
     inline struct ZobristTable {
         std::array<std::array<uint64_t, NUM_SQUARES>, PIECE_TYPES*2> pieces;
         std::array<uint64_t, Board::numCastleRights> castleRights;
