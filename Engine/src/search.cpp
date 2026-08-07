@@ -30,10 +30,20 @@ int16_t quiescenceSearch(GameState* state, SearchMetrics& metrics, int16_t alpha
     
     ++metrics.nodes;
 
-    int16_t staticEval = Eval::evaluate(state);
+    constexpr int16_t TEMPO_BONUS = 10;
+    int16_t staticEval = Eval::evaluate(state) + TEMPO_BONUS;
     int16_t bestScore = staticEval;
+    
     if(bestScore >= beta)
         return bestScore;
+
+    int16_t maxSwing = Board::getPieceValue(Board::queens);
+    if(state->promotionPossible())
+        maxSwing += Board::getPieceValue(Board::queens) - Board::getPieceValue(Board::pawns);
+
+    if(bestScore < alpha - maxSwing) //early return if max material swing cannot improve alpha
+        return bestScore;
+
     if(bestScore > alpha)
         alpha = bestScore;
 
@@ -71,10 +81,26 @@ int16_t quiescenceSearch(GameState* state, SearchMetrics& metrics, int16_t alpha
     }
     ++metrics.ttTotal;
     
-    move = moveList.pick_move();
-    while(move != Move::invalid()) {
+    while((move = moveList.pick_move()) != Move::invalid()) {
         if(!move.isCapture())
-            break;
+            continue;
+
+        //delta pruning, skip moves unlikely to raise alpha
+        constexpr int16_t delta = 200;
+        int16_t captureValue = move.getFlag() != EP_CAPTURE 
+            ? Board::getPieceValue(state->getBoard()->getPieceType(move.getTo(), Board::getOppositeColor(state->getTurn()))) : Board::getPieceValue(Board::pawns);
+        int16_t futilityValue = delta + captureValue; 
+        
+        if(captureValue <= alpha - delta) {
+            bestScore = std::max(bestScore, futilityValue);
+            continue;
+        }
+
+        int16_t staticExchangeEval = state->getSEE(move);
+        if(staticExchangeEval <= alpha - delta) {
+            bestScore = std::max(bestScore, staticExchangeEval);
+            continue;
+        }
 
         state->makeMove(move);
         int16_t score = -quiescenceSearch(state, metrics, -beta, -alpha);
@@ -88,8 +114,6 @@ int16_t quiescenceSearch(GameState* state, SearchMetrics& metrics, int16_t alpha
 
         if(score >= beta) 
             return bestScore;
-
-        move = moveList.pick_move();
     }
 
     return bestScore;
@@ -181,17 +205,20 @@ int16_t alphaBeta(GameState* state, SearchMetrics& metrics, FixedVector<Move, MA
     return alpha;
 }
 
-void iterativeDeepening(GameState* state, FixedVector<Move, MAX_SEARCH_DEPTH>& moveLine) {
-    int base = state->getTime(), increment = state->getInc();
-    int moveTime = GameState::getMoveTime(base, increment);
-    startTimer(moveTime);
+template<SearchType type>
+void iterativeDeepening(GameState* state, FixedVector<Move, MAX_SEARCH_DEPTH>& moveLine, SearchMetrics& metrics, int depth=MAX_SEARCH_DEPTH) {
+    if constexpr (type == SearchType::time) {
+        int base = state->getTime(), increment = state->getInc();
+        int moveTime = GameState::getMoveTime(base, increment);
+        startTimer(moveTime);
+    }
 
     int16_t score = 0, alpha = -VALUE_INFINITE, beta = VALUE_INFINITE;
-    for(int ply = 1; ply < MAX_SEARCH_DEPTH; ++ply) {
+    for(int ply = 1; ply <= depth; ++ply) {
         if(score == -VALUE_MATE || score == VALUE_MATE) //exit early if forced mate
             break;
 
-        SearchMetrics metrics;
+        SearchMetrics currMetrics;
         FixedVector<Move, MAX_SEARCH_DEPTH> currMoveLine;
 
         auto start = std::chrono::high_resolution_clock::now();
@@ -199,13 +226,13 @@ void iterativeDeepening(GameState* state, FixedVector<Move, MAX_SEARCH_DEPTH>& m
         int16_t delta = ASPIRATION_WIDTH / 2;
         while(!stopRequested) {
             assert(alpha >= -VALUE_INFINITE && beta <= VALUE_INFINITE);
-            score = alphaBeta(state, metrics, currMoveLine, alpha, beta, ply);
+            score = alphaBeta(state, currMetrics, currMoveLine, alpha, beta, ply);
         
             if(score <= alpha) { //failed low
                 alpha = std::max(-VALUE_INFINITE, score - delta);
                 delta *= 2;
             } else if(score >= beta) { //failed high
-                beta += std::min<int16_t>(VALUE_INFINITE, score + delta);
+                beta = std::min<int16_t>(VALUE_INFINITE, score + delta);
                 delta *= 2;
             } else {
                 alpha = score - ASPIRATION_WIDTH / 2, beta = score + ASPIRATION_WIDTH / 2;
@@ -215,13 +242,14 @@ void iterativeDeepening(GameState* state, FixedVector<Move, MAX_SEARCH_DEPTH>& m
        
         auto end = std::chrono::high_resolution_clock::now();
         auto dur = std::chrono::duration<double>(end - start).count();
-        int nps = static_cast<int>(metrics.nodes / dur);
+        int nps = static_cast<int>(currMetrics.nodes / dur);
+        metrics.nodes += currMetrics.nodes;
 
         if(stopRequested)
             break;
         
         moveLine = currMoveLine;
-        std::cout << "info depth " << ply << " score cp " << score << " nodes " << metrics.nodes << " nps " << nps << " pv";
+        std::cout << "info depth " << ply << " score cp " << score << " nodes " << currMetrics.nodes << " nps " << nps << " pv";
         for(Move move : moveLine)
             std::cout << " " << Board::getMoveString(move);
         std::cout << std::endl;
@@ -235,25 +263,23 @@ void iterativeDeepening(GameState* state, FixedVector<Move, MAX_SEARCH_DEPTH>& m
 }
 
 template<SearchType type>
-void Search::Search(GameState* state, int depth) {
+SearchMetrics Search::Search(GameState* state, int depth) {
     Board::PieceColor turn = state->getTurn();
     FixedVector<Move, MAX_SEARCH_DEPTH> moveLine;
     
+    SearchMetrics metrics;
     if constexpr (type == SearchType::depth) {
         stopRequested = false;
-        SearchMetrics metrics;
-        int16_t score = alphaBeta(state, metrics, moveLine, -VALUE_INFINITE, VALUE_INFINITE, depth);
-        std::cout << "nodes " << metrics.nodes << " score cp " << score << " pv";
-        for(Move move : moveLine)
-            std::cout << " " << Board::getMoveString(move);
-        std::cout << std::endl;
+        iterativeDeepening<SearchType::depth>(state, moveLine, metrics, depth);
     } else if constexpr (type == SearchType::time) {
         stopRequested = false;
-        iterativeDeepening(state, moveLine);
+        iterativeDeepening<SearchType::time>(state, moveLine, metrics);
     }
 
     std::cout << "bestmove " << Board::getMoveString(moveLine[0]);
     if(moveLine.size() > 1)
         std::cout << " ponder " << Board::getMoveString(moveLine[1]);
     std::cout << std::endl;
+
+    return metrics;
 }

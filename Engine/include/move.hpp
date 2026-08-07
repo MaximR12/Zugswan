@@ -104,7 +104,7 @@ inline Move MoveList::pick_move() {
         return Move::invalid();
 
     size_t bestInd = 0;
-    int16_t maxScore = std::numeric_limits<int16_t>::min();
+    int16_t maxScore = m_data[0].m_score;
     for(size_t i = 1; i < m_size; ++i) {
         int16_t currScore = m_data[i].m_score;
         if(currScore > maxScore)

@@ -5,6 +5,20 @@
 #include <sstream>
 #include <format>
 
+uint64_t Board::attacksTo(uint16_t square, PieceColor color) const {
+    assert(square >= 0 && square < NUM_SQUARES);
+
+    Board::PieceColor oppColor = Board::getOppositeColor(color);
+    uint64_t squareBB = 1ULL<<square;
+    uint64_t pawnTargets = color == Board::white ? whitePawnTargets(squareBB) : blackPawnTargets(squareBB);
+    uint64_t bishopTargets = Tables::bishopAttacks(square, m_occupiedBB);
+    uint64_t rookTargets = Tables::rookAttacks(square, m_occupiedBB);
+
+    return (pawnTargets & Board::getPieceSet(Board::pawns, oppColor)) | (knightAttackTargets(squareBB) & Board::getPieceSet(Board::knights, oppColor))
+        | (bishopTargets & Board::getPieceSet(Board::bishops, oppColor)) | (rookTargets & Board::getPieceSet(Board::rooks, oppColor))
+        | ((rookTargets | bishopTargets) & Board::getPieceSet(Board::queens, oppColor)) | (kingAttackTargets(squareBB) & Board::getPieceSet(Board::king, oppColor));
+}
+
 uint64_t Board::attackTargets(uint16_t square, PieceType type, PieceColor color) const {
     assert(square >= 0 && square < NUM_SQUARES);
     
@@ -95,16 +109,73 @@ uint64_t Board::getRayAttacks(uint16_t square, uint64_t occupied, Directions dir
    return attacks; 
 }
 
-uint16_t Board::getLeastAttacker(uint16_t square, PieceColor color) const {
+uint64_t Board::getLeastAttacker(uint64_t attackSet, PieceColor color, PieceType& piece) const {
     Board::PieceColor oppColor = getOppositeColor(color);
-    for(int piece = Board::pawns; piece < Board::king; ++piece) {
-        Board::PieceType type = static_cast<PieceType>(piece);
-        uint64_t attackers = attackTargets(square, type, color) & getPieceSet(type, oppColor);
-        if(attackers)
-            return serializeSingleBit(attackers);
+    for(piece = Board::pawns; piece <= Board::king; piece = static_cast<PieceType>(static_cast<int>(piece)+1)) {
+        int64_t subset = attackSet & m_pieceBB[color][piece];
+        if(subset)
+            return subset & -subset;
     }
 
     return 0ULL;
+}
+
+uint64_t handleXray(const Board& board, uint64_t occupied, uint16_t to) {    
+    uint64_t bishops = board.getPieceSet(Board::bishops, Board::white) | board.getPieceSet(Board::bishops, Board::black);
+    uint64_t rooks = board.getPieceSet(Board::rooks, Board::white) | board.getPieceSet(Board::rooks, Board::black);
+    uint64_t queens = board.getPieceSet(Board::queens, Board::white) | board.getPieceSet(Board::queens, Board::black);
+    uint64_t bishopTargets = Tables::bishopAttacks(to, occupied);
+    uint64_t rookTargets = Tables::rookAttacks(to, occupied);
+
+    return ((bishops & bishopTargets) | (rooks & rookTargets) | (queens & (bishopTargets | rookTargets))) & occupied; 
+}
+
+int16_t seeHelper(const Board& board, uint16_t to, Board::PieceType target, uint16_t from, Board::PieceType attacker, Board::PieceColor attackColor) {
+    constexpr size_t MAX_EXCHANGES = 32;
+
+    Board::PieceColor turn = attackColor;
+    uint16_t depth = 0;
+    std::array<int16_t, MAX_EXCHANGES> gain;
+
+    uint64_t fromSet = 1ULL<<from;
+    uint64_t possibleXray = board.getPieceSet(Board::pawns, Board::white) | board.getPieceSet(Board::bishops, Board::white)
+        | board.getPieceSet(Board::rooks, Board::white) | board.getPieceSet(Board::queens, Board::white)
+        | board.getPieceSet(Board::pawns, Board::black) | board.getPieceSet(Board::bishops, Board::black)
+        | board.getPieceSet(Board::rooks, Board::black) | board.getPieceSet(Board::queens, Board::black);
+    uint64_t occupied = board.getOccupied();
+    uint64_t attackSet = board.attacksTo(to, Board::white) | board.attacksTo(to, Board::black);
+
+    gain[depth] = Board::getPieceValue(target);
+    do {
+        ++depth;
+        turn = Board::getOppositeColor(turn);
+        gain[depth] = Board::getPieceValue(attacker) - gain[depth-1];
+        if(std::max<int16_t>(-gain[depth-1], gain[depth]) < 0) break;
+        attackSet ^= fromSet;
+        occupied ^= fromSet;
+        if(fromSet & possibleXray)
+            attackSet |= handleXray(board, occupied, to);
+        fromSet = board.getLeastAttacker(attackSet, turn, attacker);
+    } while(fromSet);
+
+    while(--depth)
+        gain[depth-1] = -std::max<int16_t>(-gain[depth-1], gain[depth]);
+
+    return gain[0];
+}
+
+int16_t Board::staticExchangeEvaluation(Move move) const {
+    assert(move.isCapture());
+
+    if(move.getFlag() == EP_CAPTURE)
+        return 0;
+
+    uint16_t to = move.getTo(), from = move.getFrom();
+    Board::PieceColor attackColor = getPieceColor(from);
+    Board::PieceType target = getPieceType(to, Board::getOppositeColor(attackColor));
+    Board::PieceType attacker = getPieceType(from, attackColor);
+
+    return seeHelper(*(this), to, target, from, attacker, attackColor);
 }
 
 constinit const std::array<Board::PieceType, 4> promoTypeTable {
@@ -270,7 +341,7 @@ uint16_t Board::serializeBitboard(uint64_t BB, std::array<uint16_t, NUM_SQUARES>
 }
 
 const std::unordered_map<int, int16_t> valueMap {
-    {Board::pawns, 100}, {Board::knights, 320}, {Board::bishops, 330}, {Board::rooks, 500}, {Board::queens, 900}
+    {Board::pawns, 100}, {Board::knights, 320}, {Board::bishops, 330}, {Board::rooks, 500}, {Board::queens, 900}, {Board::king, VALUE_INFINITE}
 };
 
 int16_t Board::getPieceValue(int type) {
@@ -293,6 +364,11 @@ int16_t materialCount(Board* board, Board::PieceColor side) {
 
 int16_t Board::materialBalance(Board* board) {
     return materialCount(board, white) - materialCount(board, black);
+}
+
+bool Board::promotionPossible(Board::PieceColor color) const {
+    uint64_t promoRank = color == Board::white ? RANK_7 : RANK_2;
+    return promoRank & getPieceSet(Board::pawns, color);
 }
 
 void Board::clearPosition() {
