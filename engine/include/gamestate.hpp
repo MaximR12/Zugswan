@@ -42,7 +42,6 @@ private:
     void removePiece(Board::PieceType type, Board::PieceColor color, uint64_t pieceBB, uint16_t square);
     void addPiece(Board::PieceType type, Board::PieceColor color, uint64_t pieceBB, uint16_t square);
     void updateCastleRights(Board::PieceColor fromColor, Board::PieceColor oppColor, uint64_t fromBB, uint64_t toBB);
-    int16_t seeHelper(uint16_t sq);
 
 public:
     GameState();
@@ -60,21 +59,21 @@ public:
     Board* getBoard() { return &m_board; }
     uint64_t getZobrist() { return m_zobrist; }
     int16_t getPst(Board::PieceColor color) { return m_pstScores[color]; }
+    int16_t getSEE(Move move) const { return m_board.staticExchangeEvaluation(move); }
 
     uint16_t getHalfMoveClock() { return m_board.getHalfMoveClock(); }
     void setLastReversible() { m_lastReversible = m_ply; }
 
     bool inCheck() const { return m_inCheck; }
     bool isRepetition() const;
+    bool promotionPossible() const { return m_board.promotionPossible(m_turn); }
 
-    void updateLegalMoves() { m_legalMoves.clear(); MoveGen::getLegalMoves(*this, m_turn, m_legalMoves); }
-    void getLegalMoves(MoveList& moveList) { m_inCheck = MoveGen::getLegalMoves(*this, m_turn, moveList); };
+    void updateLegalMoves() { m_legalMoves.clear(); MoveGen::getLegalMoves(m_board, m_turn, m_legalMoves); }
+    void getLegalMoves(MoveList& moveList) { m_inCheck = MoveGen::getLegalMoves(m_board, m_turn, moveList); };
 
     void updateTime(int wTime, int bTime, int wInc=0, int bInc=0) { m_whiteTime = wTime; m_whiteInc = wInc; m_blackTime = bTime; m_blackInc = bInc; }
     int getTime() { return m_turn == Board::white ? m_whiteTime : m_blackTime; }
     int getInc() { return m_turn == Board::white ? m_whiteInc : m_blackInc; }
-
-    int16_t staticExchangeEvaluation(Move move);
     
     static uint16_t getRow(uint16_t sq) { return ROW_LEN - sq / ROW_LEN; }
     static uint16_t getCol(uint16_t sq) { return sq % ROW_LEN; }

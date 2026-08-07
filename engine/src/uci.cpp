@@ -1,5 +1,7 @@
 #include <thread>
 #include <format>
+#include <chrono>
+#include <fstream>
 #include "uci.hpp"
 #include "perft.hpp"
 #include "search.hpp"
@@ -73,6 +75,23 @@ void UCI::position(std::istringstream& args) {
     m_state->moveFromList(moveList);
 }
 
+int parsePosFile(std::vector<std::string>& positionSet) {
+    std::ifstream file("..\\..\\..\\engine\\tests\\testfens.txt");
+
+    if(!file.is_open()) {
+        std::cerr << "Error opening fen file.\n";
+        return 0;
+    }
+
+    std::string line;
+    while(std::getline(file, line, ';')) {
+        positionSet.push_back(line);
+        std::getline(file, line); //go to next new line
+    }
+
+    return 1;
+}
+
 void UCI::bench(std::istringstream& args) {
     if(!m_working && m_worker.joinable())
         m_worker.join();
@@ -84,9 +103,36 @@ void UCI::bench(std::istringstream& args) {
     std::string position, type;
     args >> hashSize >> threads >> limit >> position >> type;
 
+    std::vector<std::string> positionSet;
+    positionSet.reserve(64);
+    if(position == "default")
+        parsePosFile(positionSet);
+
     if(type == "perft") {
         m_worker = std::thread{[state = m_state, this, limit]() {
             Perft::run<Perft::bench>(state, limit);
+            m_working = false;
+        }};
+    } else if(type == "depth") {
+        m_worker = std::thread{[state = m_state, this, positionSet, limit]() {
+            uint64_t totalNodes = 0;
+            double totalTime = 0;
+            for(const auto& pos : positionSet) {
+                Tables::TTable.clear();
+                state->loadPosition(pos);
+                auto start = std::chrono::high_resolution_clock::now();
+                SearchMetrics metrics = Search::Search<SearchType::depth>(state, limit);
+                auto end = std::chrono::high_resolution_clock::now();
+                double dur = std::chrono::duration<double>(end - start).count();
+            
+                totalTime += dur;
+                totalNodes += metrics.nodes;
+            }
+
+            std::cout << "\nTime: " << totalTime << "s\n";
+            std::cout << "Nodes searched: " << totalNodes << '\n'; 
+            std::cout << "Nodes per second: " << static_cast<int>(totalNodes / totalTime) << '\n';
+
             m_working = false;
         }};
     }

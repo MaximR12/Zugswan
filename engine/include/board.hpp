@@ -55,6 +55,8 @@ constexpr uint64_t BLACK_QUEENS = 0x0800000000000000ULL;
 constexpr uint64_t WHITE_KING = 0x0000000000000010ULL; 
 constexpr uint64_t BLACK_KING = 0x1000000000000000ULL;
 
+constexpr int16_t VALUE_INFINITE = 30'001;
+
 constexpr int16_t northOffset = 8;
 constexpr int16_t southOffset = -8;
 constexpr int16_t eastOffset = 1;
@@ -141,8 +143,13 @@ public:
     uint16_t getHalfMoveClock() const { return m_halfMoveClock; }
     PieceColor getPieceColor(uint16_t ind) const { assert(ind >= 0 && ind < NUM_SQUARES); return m_pieceBB[white][all]&(1ULL<<ind) ? white : black; }
     PieceType getPieceType(uint16_t ind, PieceColor color) const;
+    uint64_t attacksTo(uint16_t square, PieceColor color) const;
     uint64_t attackTargets(uint16_t square, PieceType type, PieceColor color) const;
-    uint16_t getLeastAttacker(uint16_t square, PieceColor color) const;
+    uint64_t getLeastAttacker(uint64_t attackSet, PieceColor color, PieceType& piece) const;
+    bool promotionPossible(Board::PieceColor color) const;
+
+    int16_t staticExchangeEvaluation(Move move) const;
+    int16_t staticCaptureEvaluation(PieceType attacker, PieceColor oppColor, uint16_t to) const { return getPieceValue(getPieceType(to, oppColor)) - getPieceValue(attacker); }
 
     void updateBB(PieceType type, PieceColor color, uint64_t BB) { m_pieceBB[color][type] = BB; }
     void updateEnPassantTargets(PieceColor color, uint64_t BB) { m_enPassantTargets[color] = BB; }
@@ -164,7 +171,6 @@ public:
     static uint64_t getPositiveRayAttacks(uint16_t square, uint64_t occupied, Directions dir);
     static uint64_t getNegativeRayAttacks(uint16_t square, uint64_t occupied, Directions dir);
     static uint64_t getRayAttacks(uint16_t square, uint64_t occupied, Directions dir);
-    int16_t staticCaptureEvaluation(PieceType attacker, PieceColor oppColor, uint16_t to) { return getPieceValue(getPieceType(to, oppColor)) - getPieceValue(attacker); }
 
     static int64_t fullBoolMask(bool cond) { return 0ULL - static_cast<uint64_t>(cond); }
     static int64_t fullBoolMask(uint64_t BB) { return 0ULL - static_cast<uint64_t>(BB != 0); }
@@ -206,7 +212,7 @@ public:
     static int16_t getDirectionOffset(int dir);
     static Directions getOppositeDirection(int dir);
     static Directions getOppositeDirection(Directions dir);
-    static PieceColor getOppositeColor(PieceColor color) { return static_cast<Board::PieceColor>((color + 1)%2); }
+    static PieceColor getOppositeColor(PieceColor color) { return static_cast<Board::PieceColor>(color ^ 1); }
     static bool isNegative(Directions dir);
     static int16_t getPieceValue(int type);
     static int16_t getPieceValue(PieceType type);

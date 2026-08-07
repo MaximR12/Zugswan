@@ -1,6 +1,5 @@
 #include <array>
 #include <unordered_map>
-#include "gamestate.hpp"
 #include "movegen.hpp"
 
 enum class MoveType {
@@ -23,15 +22,13 @@ constexpr int16_t BAD_CAPTURE_BASE = -10'000;
 constexpr int16_t QUIET_BASE = 0;
 
 template<Board::PieceColor color, MoveType type>
-int16_t scoreMove(GameState& state, Move move) {
-   if(Move::isCapture(move.getFlag())) {
-      Board* board = state.getBoard();
-      
+int16_t scoreMove(Board& board, Move move) {
+   if(Move::isCapture(move.getFlag())) {      
       constexpr Board::PieceColor oppColor = color == Board::white ? Board::black : Board::white;
       uint16_t to = move.getTo();
 
       if constexpr (type == MoveType::king) 
-         return GOOD_CAPTURE_BASE + Board::getPieceValue(board->getPieceType(to, oppColor));
+         return GOOD_CAPTURE_BASE + Board::getPieceValue(board.getPieceType(to, oppColor));
 
       constexpr Board::PieceType attackerType 
          = type == MoveType::pawn ? Board::pawns 
@@ -40,17 +37,23 @@ int16_t scoreMove(GameState& state, Move move) {
          : type == MoveType::rook ? Board::rooks
          : Board::queens;
       
-      return move.getFlag() != EP_CAPTURE ? board->staticCaptureEvaluation(attackerType, oppColor, to) : 0;
+      int16_t staticCaptureEval = move.getFlag() != EP_CAPTURE ? board.staticCaptureEvaluation(attackerType, oppColor, to) : 0;
+      if(staticCaptureEval >= 0)
+         return GOOD_CAPTURE_BASE + staticCaptureEval;
+      else {
+         int16_t staticExchangeEval = board.staticExchangeEvaluation(move);
+         return staticExchangeEval >= 0 ? GOOD_CAPTURE_BASE + staticExchangeEval : BAD_CAPTURE_BASE + staticExchangeEval;
+      }
    }
 
    return QUIET_BASE;
 }
 
 template<Board::PieceColor color, MoveType type>
-uint16_t getFlag(Board* board, uint16_t from, uint16_t to) {
+uint16_t getFlag(Board& board, uint16_t from, uint16_t to) {
    constexpr Board::PieceColor oppColor = color == Board::white ? Board::black : Board::white;
 
-   uint64_t oppPieces = board->getPieceSet(Board::all, oppColor);
+   uint64_t oppPieces = board.getPieceSet(Board::all, oppColor);
    uint64_t toBB = 1ULL << to, fromBB = 1ULL << from;
    
    uint16_t flag = QUIET_MOVE;
@@ -58,8 +61,8 @@ uint16_t getFlag(Board* board, uint16_t from, uint16_t to) {
    flag |= CAPTURE & captureMask;
 
    if constexpr (type == MoveType::pawn) {
-      uint64_t pawns = board->getPieceSet(Board::pawns, color);
-      uint64_t epTargets = board->getEnPassantTarget(color);
+      uint64_t pawns = board.getPieceSet(Board::pawns, color);
+      uint64_t epTargets = board.getEnPassantTarget(color);
       uint64_t fromIfPawn = fromBB & pawns;
       int64_t pawnMask = Board::fullBoolMask(fromIfPawn);
 
@@ -69,7 +72,7 @@ uint16_t getFlag(Board* board, uint16_t from, uint16_t to) {
    }
    
    if constexpr (type == MoveType::king) {
-      uint64_t king = board->getPieceSet(Board::king, color);
+      uint64_t king = board.getPieceSet(Board::king, color);
 
       uint64_t nonZeroIfKingCastle = (toBB >> 2) & king & fromBB;
       uint64_t nonZeroIfQueenCastle = (toBB << 2) & king & fromBB;
@@ -81,15 +84,13 @@ uint16_t getFlag(Board* board, uint16_t from, uint16_t to) {
 }
 
 template<Board::PieceColor color, MoveType type>
-void serializeMoves(GameState& state, MoveList& moveList, uint64_t targets, int16_t from) 
+void serializeMoves(Board& board, MoveList& moveList, uint64_t targets, int16_t from) 
 {
-   Board* board = state.getBoard();
-
    int16_t fromOffset;
    if constexpr (type == MoveType::pawn || type == MoveType::promotion)
       fromOffset = from; //from acts as offset for pawn moves
 
-   uint64_t occupied = board->getOccupied();
+   uint64_t occupied = board.getOccupied();
    std::array<uint16_t, NUM_SQUARES> indices;
    int len = Board::serializeBitboard(targets, indices);
 
@@ -102,33 +103,31 @@ void serializeMoves(GameState& state, MoveList& moveList, uint64_t targets, int1
       if constexpr (type != MoveType::promotion) {
          Move move = Move(flag, from, to);
          moveList.push_back(move);
-         moveList.back().m_score = scoreMove<color, type>(state, move);
+         moveList.back().m_score = scoreMove<color, type>(board, move);
       } else {
          for(uint16_t promoType = KNIGHT_PROMOTION; promoType <= QUEEN_PROMOTION; ++promoType) {
             Move move = Move(flag | promoType, from, to);
             moveList.push_back(move);
-            moveList.back().m_score = scoreMove<color, type>(state, move);
+            moveList.back().m_score = scoreMove<color, type>(board, move);
          }
       }
    }
 }
 
 template<Board::PieceColor color, MoveType type>
-void appendSliderMoves(GameState& state, MoveList& moveList, std::array<uint16_t, NUM_SQUARES>& indBuf,
+void appendSliderMoves(Board& board, MoveList& moveList, std::array<uint16_t, NUM_SQUARES>& indBuf,
       std::array<uint64_t, NUM_SQUARES>& pinMasks, Masks& masks)
 {
    assert(type == MoveType::bishop || type == MoveType::rook || type == MoveType::queen);
 
-   Board* board = state.getBoard();
-
-   uint64_t occupied = board->getOccupied();
+   uint64_t occupied = board.getOccupied();
    uint64_t pieceSet;
    if constexpr (type == MoveType::bishop)
-      pieceSet = board->getPieceSet(Board::bishops, color);
+      pieceSet = board.getPieceSet(Board::bishops, color);
    else if constexpr (type == MoveType::rook)
-      pieceSet = board->getPieceSet(Board::rooks, color);
+      pieceSet = board.getPieceSet(Board::rooks, color);
    else
-      pieceSet = board->getPieceSet(Board::queens, color);
+      pieceSet = board.getPieceSet(Board::queens, color);
 
    uint16_t numPieces = Board::serializeBitboard(pieceSet, indBuf);
    for(int i = 0; i < numPieces; ++i) {
@@ -147,15 +146,13 @@ void appendSliderMoves(GameState& state, MoveList& moveList, std::array<uint16_t
          pinMask = pinMasks[square];
 
       uint64_t legal = psuedoLegal & pinMask & masks.targetMask;
-      if(legal) serializeMoves<color, type>(state, moveList, legal, square);
+      if(legal) serializeMoves<color, type>(board, moveList, legal, square);
    }
 }
 
 template<Board::PieceColor color>
-void appendKnightMoves(GameState& state, MoveList& moveList, std::array<uint16_t, NUM_SQUARES>& indBuf, Masks& masks) {
-   Board* board = state.getBoard();
-   
-   uint64_t knights = board->getPieceSet(Board::knights, color);
+void appendKnightMoves(Board& board, MoveList& moveList, std::array<uint16_t, NUM_SQUARES>& indBuf, Masks& masks) {
+   uint64_t knights = board.getPieceSet(Board::knights, color);
    knights &= ~masks.pinned;
 
    uint64_t numKnights = Board::serializeBitboard(knights, indBuf);
@@ -164,14 +161,12 @@ void appendKnightMoves(GameState& state, MoveList& moveList, std::array<uint16_t
       uint64_t psuedoLegal = Tables::knightMoves(square);
       
       uint64_t legal = psuedoLegal & masks.targetMask;
-      if(legal) serializeMoves<color, MoveType::knight>(state, moveList, legal, square);
+      if(legal) serializeMoves<color, MoveType::knight>(board, moveList, legal, square);
    }
 }
 
 template<Board::PieceColor color>
-void appendPawnMoves(GameState& state, MoveList& moveList, std::array<uint16_t, NUM_SQUARES>& indBuf, Masks& masks) {
-   Board* board = state.getBoard();
-   
+void appendPawnMoves(Board& board, MoveList& moveList, std::array<uint16_t, NUM_SQUARES>& indBuf, Masks& masks) {   
    constexpr Board::PieceColor oppColor = color == Board::white ? Board::black : Board::white;
    constexpr uint64_t pawnRank = color == Board::white ? RANK_2 : RANK_7;
 
@@ -189,10 +184,10 @@ void appendPawnMoves(GameState& state, MoveList& moveList, std::array<uint16_t, 
    else
       leftDiagMask = masks.diagMovable, rightDiagMask = masks.antiMovable;
 
-   uint64_t pawns = board->getPieceSet(Board::pawns, color);
-   uint64_t oppPieces = board->getPieceSet(Board::all, oppColor);
-   uint64_t epAttackTarget = board->getEnPassantTarget(color);
-   uint64_t empty = board->getEmpty();
+   uint64_t pawns = board.getPieceSet(Board::pawns, color);
+   uint64_t oppPieces = board.getPieceSet(Board::all, oppColor);
+   uint64_t epAttackTarget = board.getEnPassantTarget(color);
+   uint64_t empty = board.getEmpty();
    uint64_t targetMask = masks.pawnTargetMask; 
 
    uint64_t pushable = pawns & masks.verMovable;
@@ -202,36 +197,34 @@ void appendPawnMoves(GameState& state, MoveList& moveList, std::array<uint16_t, 
    uint64_t leftAttacks = Board::shift<upLeft>(pawns & leftDiagMask) & (oppPieces | epAttackTarget) & targetMask;
    uint64_t rightAttacks = Board::shift<upRight>(pawns & rightDiagMask) & (oppPieces | epAttackTarget) & targetMask;
    
-   if(singlePushTargets & NOT_LAST_RANK) serializeMoves<color, MoveType::pawn>(state, moveList, singlePushTargets & NOT_LAST_RANK, downOffset);
-   if(doublePushTargets) serializeMoves<color, MoveType::pawn>(state, moveList, doublePushTargets, downOffset*2);
-   if(rightAttacks & NOT_LAST_RANK) serializeMoves<color, MoveType::pawn>(state, moveList, rightAttacks & NOT_LAST_RANK, downLeftOffset);
-   if(leftAttacks & NOT_LAST_RANK) serializeMoves<color, MoveType::pawn>(state, moveList, leftAttacks & NOT_LAST_RANK, downRightOffset);
+   if(singlePushTargets & NOT_LAST_RANK) serializeMoves<color, MoveType::pawn>(board, moveList, singlePushTargets & NOT_LAST_RANK, downOffset);
+   if(doublePushTargets) serializeMoves<color, MoveType::pawn>(board, moveList, doublePushTargets, downOffset*2);
+   if(rightAttacks & NOT_LAST_RANK) serializeMoves<color, MoveType::pawn>(board, moveList, rightAttacks & NOT_LAST_RANK, downLeftOffset);
+   if(leftAttacks & NOT_LAST_RANK) serializeMoves<color, MoveType::pawn>(board, moveList, leftAttacks & NOT_LAST_RANK, downRightOffset);
 
-   if(singlePushTargets & LAST_RANK) serializeMoves<color, MoveType::promotion>(state, moveList, singlePushTargets & LAST_RANK, downOffset);
-   if(rightAttacks & LAST_RANK) serializeMoves<color, MoveType::promotion>(state, moveList, rightAttacks & LAST_RANK, downLeftOffset);
-   if(leftAttacks & LAST_RANK) serializeMoves<color, MoveType::promotion>(state, moveList, leftAttacks & LAST_RANK, downRightOffset);
+   if(singlePushTargets & LAST_RANK) serializeMoves<color, MoveType::promotion>(board, moveList, singlePushTargets & LAST_RANK, downOffset);
+   if(rightAttacks & LAST_RANK) serializeMoves<color, MoveType::promotion>(board, moveList, rightAttacks & LAST_RANK, downLeftOffset);
+   if(leftAttacks & LAST_RANK) serializeMoves<color, MoveType::promotion>(board, moveList, leftAttacks & LAST_RANK, downRightOffset);
 }
 
 template<Board::PieceColor color>
-void appendKingMoves(GameState& state, MoveList& moveList, Masks& masks) {
-   Board* board = state.getBoard();
-   
+void appendKingMoves(Board& board, MoveList& moveList, Masks& masks) {   
    uint64_t targetMask = masks.kingTargetMask;
-   uint64_t king = board->getPieceSet(Board::king, color);
+   uint64_t king = board.getPieceSet(Board::king, color);
    uint16_t kingSquare = Board::serializeSingleBit(king);
    
    uint64_t targets = Tables::kingMoves(kingSquare) & targetMask;
-   if(targets) serializeMoves<color, MoveType::king>(state, moveList, targets, kingSquare);
+   if(targets) serializeMoves<color, MoveType::king>(board, moveList, targets, kingSquare);
 
-   bool kingCastleRights = board->getKingCastleRights(color);
-   bool queenCastleRights = board->getQueenCastleRights(color);
+   bool kingCastleRights = board.getKingCastleRights(color);
+   bool queenCastleRights = board.getQueenCastleRights(color);
 
    if(!kingCastleRights && !queenCastleRights)
       return;
 
-   uint64_t rooks = board->getPieceSet(Board::rooks, color);
-   uint64_t occupied = board->getOccupied();
-   uint64_t empty = board->getEmpty();
+   uint64_t rooks = board.getPieceSet(Board::rooks, color);
+   uint64_t occupied = board.getOccupied();
+   uint64_t empty = board.getEmpty();
    uint64_t notInCheck = masks.notInCheck;
 
    targetMask &= empty;
@@ -243,7 +236,7 @@ void appendKingMoves(GameState& state, MoveList& moveList, Masks& masks) {
    uint64_t rightCastle = westTwo & Board::nullBoolMask(Board::shift<Board::west>(westTwo) & occupied) & queenCastleMask & Board::fullBoolMask((king >> 4) & rooks) & notInCheck; //queen castle includes occupency check of square west of queen rook
 
    uint64_t castleTargets = leftCastle | rightCastle;
-   if(castleTargets) serializeMoves<color, MoveType::king>(state, moveList, castleTargets, kingSquare);
+   if(castleTargets) serializeMoves<color, MoveType::king>(board, moveList, castleTargets, kingSquare);
 }
 
 void populatePinMasks(std::array<uint64_t, NUM_SQUARES>& pinMasks, std::array<uint16_t, NUM_SQUARES>& indBuf, Board::SliderRays dir, uint64_t inBetween) {
@@ -256,21 +249,20 @@ void populatePinMasks(std::array<uint64_t, NUM_SQUARES>& pinMasks, std::array<ui
 
 //populates mask array
 template<Board::PieceColor color>
-void generateMasks(GameState& state, Masks& masks, std::array<uint64_t, NUM_SQUARES>& pinMasks, std::array<uint16_t, NUM_SQUARES>& indBuf) {
+void generateMasks(Board& board, Masks& masks, std::array<uint64_t, NUM_SQUARES>& pinMasks, std::array<uint16_t, NUM_SQUARES>& indBuf) {
    constexpr Board::PieceColor oppColor = color == Board::white ? Board::black : Board::white;
    constexpr Board::Directions up = color == Board::white ? Board::north : Board::south;
-   Board* board = state.getBoard();
 
-   uint64_t empty = board->getEmpty();
-   uint64_t occupied = board->getOccupied();
-   uint64_t pieces = board->getPieceSet(Board::all, color);
-   uint64_t king = board->getPieceSet(Board::king, color);
+   uint64_t empty = board.getEmpty();
+   uint64_t occupied = board.getOccupied();
+   uint64_t pieces = board.getPieceSet(Board::all, color);
+   uint64_t king = board.getPieceSet(Board::king, color);
    uint16_t kingSquare = Board::serializeSingleBit(king);
-   uint64_t oppKing = board->getPieceSet(Board::king, oppColor);
-   uint64_t oppPawns = board->getPieceSet(Board::pawns, oppColor);
-   uint64_t oppKnights = board->getPieceSet(Board::knights, oppColor);
-   uint64_t oppRookLike = board->getPieceSet(Board::rooks, oppColor) | board->getPieceSet(Board::queens, oppColor);
-   uint64_t oppBishopLike = board->getPieceSet(Board::bishops, oppColor) | board->getPieceSet(Board::queens, oppColor);
+   uint64_t oppKing = board.getPieceSet(Board::king, oppColor);
+   uint64_t oppPawns = board.getPieceSet(Board::pawns, oppColor);
+   uint64_t oppKnights = board.getPieceSet(Board::knights, oppColor);
+   uint64_t oppRookLike = board.getPieceSet(Board::rooks, oppColor) | board.getPieceSet(Board::queens, oppColor);
+   uint64_t oppBishopLike = board.getPieceSet(Board::bishops, oppColor) | board.getPieceSet(Board::queens, oppColor);
 
    uint64_t oppSliderNorth = Board::northFill(oppRookLike, empty | king);
    uint64_t oppSliderSouth = Board::southFill(oppRookLike, empty | king);
@@ -335,29 +327,29 @@ void generateMasks(GameState& state, Masks& masks, std::array<uint64_t, NUM_SQUA
    uint64_t checkTo = checkFrom | blocks | nullIfCheck;
 
    masks.targetMask = ~pieces & checkTo & nullIfDoubleCheck;
-   masks.pawnTargetMask = (masks.targetMask | (board->getEnPassantTarget(color) & Board::shift<up>(pawnCheckFrom))); //include en passant capture of pawn checker
+   masks.pawnTargetMask = (masks.targetMask | (board.getEnPassantTarget(color) & Board::shift<up>(pawnCheckFrom))); //include en passant capture of pawn checker
    masks.kingTargetMask = ~(pieces | oppAnyAttacks);
    masks.notInCheck = nullIfCheck;
 }
 
 template<Board::PieceColor color>
-bool generate(GameState& state, MoveList& moveList) {
+bool generate(Board& board, MoveList& moveList) {
    Masks masks;
    std::array<uint16_t, NUM_SQUARES> indBuf;
    std::array<uint64_t, NUM_SQUARES> pinMasks;
-   generateMasks<color>(state, masks, pinMasks, indBuf);
+   generateMasks<color>(board, masks, pinMasks, indBuf);
 
-   appendPawnMoves<color>(state, moveList, indBuf, masks);
-   appendKnightMoves<color>(state, moveList, indBuf, masks);
-   appendSliderMoves<color, MoveType::bishop>(state, moveList, indBuf, pinMasks, masks);
-   appendSliderMoves<color, MoveType::rook>(state, moveList, indBuf, pinMasks, masks);
-   appendSliderMoves<color, MoveType::queen>(state, moveList, indBuf, pinMasks, masks);
-   appendKingMoves<color>(state, moveList, masks);
+   appendPawnMoves<color>(board, moveList, indBuf, masks);
+   appendKnightMoves<color>(board, moveList, indBuf, masks);
+   appendSliderMoves<color, MoveType::bishop>(board, moveList, indBuf, pinMasks, masks);
+   appendSliderMoves<color, MoveType::rook>(board, moveList, indBuf, pinMasks, masks);
+   appendSliderMoves<color, MoveType::queen>(board, moveList, indBuf, pinMasks, masks);
+   appendKingMoves<color>(board, moveList, masks);
 
    return !masks.notInCheck;
 }
 
-bool MoveGen::getLegalMoves(GameState& state, Board::PieceColor color, MoveList& moveList) {
+bool MoveGen::getLegalMoves(Board& board, Board::PieceColor color, MoveList& moveList) {
    assert(Tables::initialized);
-   return color == Board::white ? generate<Board::white>(state, moveList) : generate<Board::black>(state, moveList); 
+   return color == Board::white ? generate<Board::white>(board, moveList) : generate<Board::black>(board, moveList); 
 }

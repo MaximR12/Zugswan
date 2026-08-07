@@ -1,5 +1,6 @@
 #include "gamestate.hpp"
 #include <unordered_map>
+#include <limits>
 #include <chrono>
 
 GameState::GameState() { 
@@ -272,36 +273,6 @@ bool GameState::isRepetition() const {
     return false;
 }
 
-int16_t GameState::seeHelper(uint16_t sq) {
-    int16_t score = 0;
-    uint16_t leastAttackerFrom = m_board.getLeastAttacker(sq, Board::getOppositeColor(m_turn));
-    
-    if(leastAttackerFrom) {
-        Board::PieceType captureType = m_board.getPieceType(sq, Board::getOppositeColor(m_turn));
-        Move captureMove = Move(CAPTURE, leastAttackerFrom, sq);
-        makeMove(captureMove);
-
-        int16_t gain = Board::getPieceValue(captureType) - seeHelper(sq);
-        score = std::max(score, gain);
-        unmakeMove(captureMove);
-    }
-
-    return score;
-}
-
-int16_t GameState::staticExchangeEvaluation(Move move) {
-    assert(move.isCapture());
-
-    uint16_t to = move.getTo();
-    int16_t capturePieceVal = Board::getPieceValue(m_board.getPieceType(to, Board::getOppositeColor(m_turn)));
-
-    makeMove(move);
-    int16_t score = capturePieceVal - seeHelper(to);
-    unmakeMove(move);
-    
-    return score;
-}
-
 void GameState::loadPosition(std::string fen) {
     m_turn = m_board.loadPosition(fen);
     m_zobrist = GameState::calculateZobrist(&m_board, m_turn);
@@ -331,7 +302,7 @@ void GameState::moveFromList(std::vector<std::string>& moveList) {
             if(curr.isPromotion() && (Board::getPromoType(curr.getFlag()) != promoType))
                 continue;
 
-            if(curr.getFrom() == from && curr.getTo() == to) {
+            if(curr.getFrom() == from && curr.getTo() == to) {                
                 makeMove(curr);
                 updateLegalMoves();
                 break;
