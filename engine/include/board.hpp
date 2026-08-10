@@ -84,6 +84,9 @@ constexpr int NUM_ORTHOGONAL_DIRECTIONS = 4;
 constexpr int NUM_MASK_TYPES = 10;
 constexpr int ROW_LEN = 8;
 
+constexpr int UNDEFINED_SQUARE = 65;
+constexpr int MAX_GAME_LENGTH = 1024;
+
 class Board {
 private:
     std::array<std::array<uint64_t, NUM_PIECE_TYPES>, 2> m_pieceBB;

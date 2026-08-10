@@ -13,6 +13,6 @@ enum class GenType {
 namespace MoveGen {
 
     //return true if in check
-    bool getLegalMoves(Board& board, Board::PieceColor color, MoveList& moveList);
+    bool getLegalMoves(Board& board, Board::PieceColor color, MoveList& moveList, uint16_t ply);
 
 }

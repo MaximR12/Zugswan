@@ -158,9 +158,10 @@ void UCI::run() {
             std::cout << "readyok" << std::endl;
         else if(token == "uci")
             std::cout << "id name Zugswan\nid author Max\nuciok" << std::endl;
-        else if(token == "ucinewgame")
+        else if(token == "ucinewgame") {
             Tables::TTable.clear();
-
+            Tables::clearKiller();
+        }
     } while(token != "quit");
 
     if(m_worker.joinable())

@@ -23,6 +23,8 @@ public:
 constexpr size_t PIECE_TYPES = 6;
 constexpr size_t FILES = 8;
 
+constexpr int KILLERS_PER_PLY = 2;
+
 namespace Tables {
     inline Random rand;
     inline bool initialized = false;
@@ -37,6 +39,9 @@ namespace Tables {
     uint64_t rookAttacks(uint16_t square, uint64_t occupied);
 
     int16_t pstScore(Board::PieceColor side, Board::PieceType type, uint16_t square);
+    bool isKiller(Move move, uint16_t ply);
+    void insertKiller(Move move, uint16_t ply);
+    void clearKiller();
 
     inline struct ZobristTable {
         std::array<std::array<uint64_t, NUM_SQUARES>, PIECE_TYPES*2> pieces;

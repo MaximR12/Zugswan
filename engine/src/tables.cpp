@@ -411,6 +411,28 @@ int16_t Tables::pstScore(Board::PieceColor side, Board::PieceType type, uint16_t
     return side == Board::white ? pieceSquareTables[type][square^56] : pieceSquareTables[type][square];  
 }
 
+std::array<std::array<Move, KILLERS_PER_PLY>, MAX_GAME_LENGTH> killerTable;
+
+void Tables::insertKiller(Move move, uint16_t ply) {
+    assert(ply < MAX_GAME_LENGTH);
+
+    auto& kArray = killerTable[ply];
+    if(kArray[0] != move) {
+        kArray[1] = kArray[0];
+        kArray[0] = move;
+    }
+}
+
+bool Tables::isKiller(Move move, uint16_t ply) {
+    return (killerTable[ply][0] == move || killerTable[ply][1] == move);
+}
+
+void Tables::clearKiller() {
+    for(auto& kArray : killerTable)
+        for(Move& move : kArray)
+            move = Move::invalid();
+}
+
 void Tables::init() {
     initRayAttackTables();
     initPawnAttackTables();
@@ -419,6 +441,7 @@ void Tables::init() {
 
     initMagicTable();
     initZobristTable();
+    clearKiller();
 
     initialized = true;
 }
