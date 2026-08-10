@@ -6,9 +6,6 @@
 #include "movegen.hpp"
 #include "move.hpp"
 
-constexpr int UNDEFINED_SQUARE = 65;
-constexpr int MAX_GAME_LENGTH = 1024;
-
 struct StateInfo {
     uint64_t epTarget;
     uint64_t oppEpTarget;
@@ -60,6 +57,7 @@ public:
     uint64_t getZobrist() { return m_zobrist; }
     int16_t getPst(Board::PieceColor color) { return m_pstScores[color]; }
     int16_t getSEE(Move move) const { return m_board.staticExchangeEvaluation(move); }
+    uint16_t getPly() const { return m_ply; }
 
     uint16_t getHalfMoveClock() { return m_board.getHalfMoveClock(); }
     void setLastReversible() { m_lastReversible = m_ply; }
@@ -68,8 +66,8 @@ public:
     bool isRepetition() const;
     bool promotionPossible() const { return m_board.promotionPossible(m_turn); }
 
-    void updateLegalMoves() { m_legalMoves.clear(); MoveGen::getLegalMoves(m_board, m_turn, m_legalMoves); }
-    void getLegalMoves(MoveList& moveList) { m_inCheck = MoveGen::getLegalMoves(m_board, m_turn, moveList); };
+    void updateLegalMoves() { m_legalMoves.clear(); MoveGen::getLegalMoves(m_board, m_turn, m_legalMoves, m_ply); }
+    void getLegalMoves(MoveList& moveList) { m_inCheck = MoveGen::getLegalMoves(m_board, m_turn, moveList, m_ply); };
 
     void updateTime(int wTime, int bTime, int wInc=0, int bInc=0) { m_whiteTime = wTime; m_whiteInc = wInc; m_blackTime = bTime; m_blackInc = bInc; }
     int getTime() { return m_turn == Board::white ? m_whiteTime : m_blackTime; }

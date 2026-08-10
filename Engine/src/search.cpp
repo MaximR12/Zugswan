@@ -193,6 +193,8 @@ int16_t alphaBeta(GameState* state, SearchMetrics& metrics, FixedVector<Move, MA
         }
 
         if(score >= beta) {
+            if(!move.isCapture())
+                Tables::insertKiller(move, state->getPly());
             Tables::TTable.insert(zobrist, NodeType::lower, move, depth, score);
             return bestScore;
         }
@@ -207,6 +209,8 @@ int16_t alphaBeta(GameState* state, SearchMetrics& metrics, FixedVector<Move, MA
 
 template<SearchType type>
 void iterativeDeepening(GameState* state, FixedVector<Move, MAX_SEARCH_DEPTH>& moveLine, SearchMetrics& metrics, int depth=MAX_SEARCH_DEPTH) {
+    stopRequested = false;
+
     if constexpr (type == SearchType::time) {
         int base = state->getTime(), increment = state->getInc();
         int moveTime = GameState::getMoveTime(base, increment);
@@ -268,13 +272,10 @@ SearchMetrics Search::Search(GameState* state, int depth) {
     FixedVector<Move, MAX_SEARCH_DEPTH> moveLine;
     
     SearchMetrics metrics;
-    if constexpr (type == SearchType::depth) {
-        stopRequested = false;
+    if constexpr (type == SearchType::depth)
         iterativeDeepening<SearchType::depth>(state, moveLine, metrics, depth);
-    } else if constexpr (type == SearchType::time) {
-        stopRequested = false;
+    else if constexpr (type == SearchType::time)
         iterativeDeepening<SearchType::time>(state, moveLine, metrics);
-    }
 
     std::cout << "bestmove " << Board::getMoveString(moveLine[0]);
     if(moveLine.size() > 1)
