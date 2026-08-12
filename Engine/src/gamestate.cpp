@@ -53,14 +53,16 @@ void GameState::addPiece(Board::PieceType type, Board::PieceColor color, uint64_
 }
 
 void GameState::makeMove(Move move) {
+    Board::PieceColor turn = m_board.getTurn();
+    
     m_undoStack.push_back(StateInfo{
-        .epTarget=m_board.getEnPassantTarget(m_turn),
-        .oppEpTarget=m_board.getEnPassantTarget(Board::getOppositeColor(m_turn)),
+        .epTarget=m_board.getEnPassantTarget(turn),
+        .oppEpTarget=m_board.getEnPassantTarget(Board::getOppositeColor(turn)),
         .captureType=Board::invalid,
         .halfMoveClock=m_board.getHalfMoveClock(),
         .lastReversible=m_lastReversible,
-        .kingCastleRights=m_board.getKingCastleRights(m_turn),
-        .queenCastleRights=m_board.getQueenCastleRights(m_turn),
+        .kingCastleRights=m_board.getKingCastleRights(turn),
+        .queenCastleRights=m_board.getQueenCastleRights(turn),
     });
 
     uint16_t fromInd = move.getFrom(), toInd = move.getTo();
@@ -68,22 +70,21 @@ void GameState::makeMove(Move move) {
     uint64_t toBB = 1ULL << toInd; 
     uint64_t fromToBB = fromBB ^ toBB;
 
-    Board::PieceColor fromColor = m_turn;
-    Board::PieceColor oppColor = Board::getOppositeColor(fromColor);
-    Board::PieceType fromType = m_board.getPieceType(fromInd, fromColor);
+    Board::PieceColor oppColor = Board::getOppositeColor(turn);
+    Board::PieceType fromType = m_board.getPieceType(fromInd, turn);
 
-    updateCastleRights(fromColor, oppColor, fromBB, toBB);
+    updateCastleRights(turn, oppColor, fromBB, toBB);
 
     uint16_t flag = move.getFlag();
     if(!move.isCapture() || flag == EP_CAPTURE) {
-        movePiece(fromType, fromColor, fromToBB, fromInd, toInd);
+        movePiece(fromType, turn, fromToBB, fromInd, toInd);
         updateOccupied(m_board, m_board.getOccupied() ^ fromToBB);
     } else {
         setLastReversible();
         m_board.resetHalfMoveClock();
         Board::PieceType captureType = m_board.getPieceType(toInd, oppColor);
         m_undoStack.back().captureType = captureType;
-        movePiece(fromType, fromColor, fromToBB, fromInd, toInd);
+        movePiece(fromType, turn, fromToBB, fromInd, toInd);
         removePiece(captureType, oppColor, toBB, toInd);
         updateOccupied(m_board, m_board.getOccupied() ^ fromBB);
     }
@@ -93,7 +94,7 @@ void GameState::makeMove(Move move) {
         m_board.resetHalfMoveClock();
         if(flag == DOUBLE_PAWN_PUSH) {
             uint64_t epTarget, epCapturers;
-            if(fromColor == Board::white) {
+            if(turn == Board::white) {
                 epTarget = Board::shift<Board::south>(toBB);
                 epCapturers = m_board.whitePawnTargets(epTarget) & m_board.getPieceSet(Board::pawns, Board::black);
             } else {
@@ -104,7 +105,7 @@ void GameState::makeMove(Move move) {
             uint64_t empty = m_board.getEmpty();
             uint64_t emptyBeforeMove = empty | toBB; //hor pin test needs to happen before double pawn push move
 
-            uint64_t rookLike = m_board.getPieceSet(Board::rooks, fromColor) | m_board.getPieceSet(Board::queens, fromColor);
+            uint64_t rookLike = m_board.getPieceSet(Board::rooks, turn) | m_board.getPieceSet(Board::queens, turn);
             uint64_t oppKing = m_board.getPieceSet(Board::king, oppColor);
 
             uint64_t horInBetween = (Board::eastFill(rookLike, emptyBeforeMove) & Board::westFill(oppKing, emptyBeforeMove))
@@ -117,7 +118,7 @@ void GameState::makeMove(Move move) {
                 m_zobrist ^= Tables::ZTable.epFiles[Board::getFile(epTarget)]; 
         } else if(flag == EP_CAPTURE) {
             uint64_t captureSquare;
-            if(fromColor == Board::white)
+            if(turn == Board::white)
                 captureSquare = Board::shift<Board::south>(toBB);
             else
                 captureSquare = Board::shift<Board::north>(toBB);
@@ -128,38 +129,38 @@ void GameState::makeMove(Move move) {
             updateOccupied(m_board, m_board.getOccupied() ^ captureSquare);
         } else if(Move::isPromotion(flag)) {
             Board::PieceType promoType = Board::getPromoType(flag);
-            m_board.updateBB(Board::pawns, fromColor, m_board.getPieceSet(Board::pawns, fromColor) & NOT_LAST_RANK);
-            uint64_t promoSet = m_board.getPieceSet(promoType, fromColor);
-            m_board.updateBB(promoType, fromColor, promoSet | toBB);
+            m_board.updateBB(Board::pawns, turn, m_board.getPieceSet(Board::pawns, turn) & NOT_LAST_RANK);
+            uint64_t promoSet = m_board.getPieceSet(promoType, turn);
+            m_board.updateBB(promoType, turn, promoSet | toBB);
 
-            m_zobrist ^= Tables::ZTable.pieces[Board::pawns+(m_turn*PIECE_TYPES)][toInd];
-            m_zobrist ^= Tables::ZTable.pieces[promoType+(m_turn*PIECE_TYPES)][toInd];
-            m_pstScores[fromColor] -= Tables::pstScore(fromColor, Board::pawns, toInd);
-            m_pstScores[fromColor] += Tables::pstScore(fromColor, promoType, toInd);
+            m_zobrist ^= Tables::ZTable.pieces[Board::pawns+(turn*PIECE_TYPES)][toInd];
+            m_zobrist ^= Tables::ZTable.pieces[promoType+(turn*PIECE_TYPES)][toInd];
+            m_pstScores[turn] -= Tables::pstScore(turn, Board::pawns, toInd);
+            m_pstScores[turn] += Tables::pstScore(turn, promoType, toInd);
         }
     } else if(flag == KING_CASTLE) {
         setLastReversible();
-        uint64_t rooks = m_board.getPieceSet(Board::rooks, fromColor);
+        uint64_t rooks = m_board.getPieceSet(Board::rooks, turn);
         uint64_t kingRook = fromBB << 3;
         uint64_t rookFromToBB = kingRook | (kingRook >> 2);
         uint16_t from = Board::serializeSingleBit(kingRook), to = Board::serializeSingleBit(kingRook >> 2);
 
-        movePiece(Board::rooks, fromColor, rookFromToBB, from, to);
+        movePiece(Board::rooks, turn, rookFromToBB, from, to);
         updateOccupied(m_board, m_board.getOccupied() ^ rookFromToBB);
     } else if(flag == QUEEN_CASTLE) {
         setLastReversible();
-        uint64_t rooks = m_board.getPieceSet(Board::rooks, fromColor);
+        uint64_t rooks = m_board.getPieceSet(Board::rooks, turn);
         uint64_t queenRook = fromBB >> 4;
         uint64_t rookFromToBB = queenRook | (queenRook << 3);
         uint16_t from = Board::serializeSingleBit(queenRook), to = Board::serializeSingleBit(queenRook << 3);
 
-        movePiece(Board::rooks, fromColor, rookFromToBB, from, to);
+        movePiece(Board::rooks, turn, rookFromToBB, from, to);
         updateOccupied(m_board, m_board.getOccupied() ^ rookFromToBB); 
     }
 
-    uint64_t epTarget = m_board.getEnPassantTarget(fromColor);
+    uint64_t epTarget = m_board.getEnPassantTarget(turn);
     if(epTarget){
-        m_board.updateEnPassantTargets(fromColor, 0ULL);
+        m_board.updateEnPassantTargets(turn, 0ULL);
         m_zobrist ^= Tables::ZTable.epFiles[Board::getFile(epTarget)]; 
     }
 
@@ -168,7 +169,7 @@ void GameState::makeMove(Move move) {
     m_hashList.push_back(m_zobrist);
     ++m_ply;
 
-    assert(m_zobrist == GameState::calculateZobrist(&m_board, m_turn));
+    assert(m_zobrist == GameState::calculateZobrist(&m_board));
     assert(m_pstScores[Board::white] == GameState::calculatePstScore(&m_board, Board::white)
         && m_pstScores[Board::black] == GameState::calculatePstScore(&m_board, Board::black));
 }
@@ -182,8 +183,8 @@ void GameState::unmakeMove(Move move) {
     uint64_t toBB = 1ULL << toInd; 
     uint64_t fromToBB = fromBB ^ toBB;
 
-    Board::PieceColor fromColor = Board::getOppositeColor(m_turn);
-    Board::PieceColor oppColor = m_turn;
+    Board::PieceColor fromColor = Board::getOppositeColor(m_board.getTurn());
+    Board::PieceColor oppColor = m_board.getTurn();
     Board::PieceType fromType = m_board.getPieceType(toInd, fromColor);
 
     uint16_t flag = move.getFlag();
@@ -240,7 +241,7 @@ void GameState::unmakeMove(Move move) {
 
     if(stateInfo.epTarget) 
         m_zobrist ^= Tables::ZTable.epFiles[Board::getFile(stateInfo.epTarget)];
-    uint64_t epTarget = m_board.getEnPassantTarget(m_turn);
+    uint64_t epTarget = m_board.getEnPassantTarget(oppColor);
     if(epTarget)
         m_zobrist ^= Tables::ZTable.epFiles[Board::getFile(epTarget)];
     m_board.updateEnPassantTargets(fromColor, stateInfo.epTarget);
@@ -260,7 +261,7 @@ void GameState::unmakeMove(Move move) {
     switchTurn();
     --m_ply;
 
-    assert(m_zobrist == GameState::calculateZobrist(&m_board, m_turn));
+    assert(m_zobrist == GameState::calculateZobrist(&m_board));
     assert(m_pstScores[Board::white] == GameState::calculatePstScore(&m_board, Board::white)
         && m_pstScores[Board::black] == GameState::calculatePstScore(&m_board, Board::black));
 }
@@ -274,8 +275,8 @@ bool GameState::isRepetition() const {
 }
 
 void GameState::loadPosition(std::string fen) {
-    m_turn = m_board.loadPosition(fen);
-    m_zobrist = GameState::calculateZobrist(&m_board, m_turn);
+    m_board.loadPosition(fen);
+    m_zobrist = GameState::calculateZobrist(&m_board);
     m_pstScores[Board::white] = GameState::calculatePstScore(&m_board, Board::white);
     m_pstScores[Board::black] = GameState::calculatePstScore(&m_board, Board::black);
     m_lastReversible = 0;
@@ -324,7 +325,7 @@ int16_t GameState::calculatePstScore(Board* board, Board::PieceColor turn) {
     return pst;
 }
 
-uint64_t GameState::calculateZobrist(Board* board, Board::PieceColor turn) {
+uint64_t GameState::calculateZobrist(Board* board) {
     uint64_t zobrist = 0;
     std::array<uint16_t, NUM_SQUARES> indBuf;
     for(int color = Board::white; color <= Board::black; ++color) {
@@ -337,6 +338,7 @@ uint64_t GameState::calculateZobrist(Board* board, Board::PieceColor turn) {
         }
     }
 
+    Board::PieceColor turn = board->getTurn();
     uint64_t epTarget = board->getEnPassantTarget(turn);
     if(epTarget) 
         zobrist ^= Tables::ZTable.epFiles[Board::getFile(epTarget)];

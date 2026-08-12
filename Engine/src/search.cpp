@@ -173,11 +173,15 @@ int16_t alphaBeta(GameState* state, SearchMetrics& metrics, FixedVector<Move, MA
         move = moveList.pick_move();
     ++metrics.ttTotal;
 
+    FixedVector<Move, MAX_LEGAL_MOVES> quietsSearched;
     NodeType type = NodeType::upper;
     int16_t bestScore = -VALUE_INFINITE;
-    Move bestMove = move;
+    Move bestMove = Move::invalid();
 
-    while(move != Move::invalid()) { 
+    while(move != Move::invalid()) {
+        if(!move.isCapture())
+            quietsSearched.push_back(move);
+
         state->makeMove(move);
         int16_t score = -alphaBeta(state, metrics, moveLine, -beta, -alpha, depth-1);
         state->unmakeMove(move);
@@ -193,8 +197,15 @@ int16_t alphaBeta(GameState* state, SearchMetrics& metrics, FixedVector<Move, MA
         }
 
         if(score >= beta) {
-            if(!move.isCapture())
+            if(!move.isCapture()) {
                 Tables::insertKiller(move, state->getPly());
+
+                const int16_t bonus = 300 * depth - 250, malus = 200 * depth - 150;
+                Tables::updateHistory(state->getTurn(), move.getFrom(), move.getTo(), bonus); 
+                for(Move qMove : quietsSearched)
+                    Tables::updateHistory(state->getTurn(), qMove.getFrom(), qMove.getTo(), -malus);
+            }
+
             Tables::TTable.insert(zobrist, NodeType::lower, move, depth, score);
             return bestScore;
         }
@@ -204,6 +215,7 @@ int16_t alphaBeta(GameState* state, SearchMetrics& metrics, FixedVector<Move, MA
 
     if(!stopRequested.load(std::memory_order_relaxed))
         Tables::TTable.insert(zobrist, type, bestMove, depth, bestScore);
+
     return alpha;
 }
 

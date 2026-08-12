@@ -17,10 +17,11 @@ struct Masks {
    uint64_t notInCheck;
 };
 
-constexpr int16_t KILLER_BASE = 5'000;
-constexpr int16_t GOOD_CAPTURE_BASE = 10'000;
-constexpr int16_t BAD_CAPTURE_BASE = -10'000;
+//move ordering levels
+constexpr int16_t GOOD_CAPTURE_BASE = 30'000;
+constexpr int16_t KILLER_BASE = 20'000;
 constexpr int16_t QUIET_BASE = 0;
+constexpr int16_t BAD_CAPTURE_BASE = -30'000;
 
 template<Board::PieceColor color, MoveType type>
 int16_t scoreMove(Board& board, Move move, uint16_t ply) {
@@ -47,7 +48,7 @@ int16_t scoreMove(Board& board, Move move, uint16_t ply) {
       }
    }
 
-   return QUIET_BASE + KILLER_BASE * Tables::isKiller(move, ply);
+   return QUIET_BASE + KILLER_BASE * Tables::isKiller(move, ply) + Tables::historyScore(board.getTurn(), move.getFrom(), move.getTo());
 }
 
 template<Board::PieceColor color, MoveType type>
@@ -350,7 +351,7 @@ bool generate(Board& board, MoveList& moveList, uint16_t ply) {
    return !masks.notInCheck;
 }
 
-bool MoveGen::getLegalMoves(Board& board, Board::PieceColor color, MoveList& moveList, uint16_t ply) {
+bool MoveGen::getLegalMoves(Board& board, MoveList& moveList, uint16_t ply) {
    assert(Tables::initialized);
-   return color == Board::white ? generate<Board::white>(board, moveList, ply) : generate<Board::black>(board, moveList, ply); 
+   return board.getTurn() == Board::white ? generate<Board::white>(board, moveList, ply) : generate<Board::black>(board, moveList, ply); 
 }

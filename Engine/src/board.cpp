@@ -366,9 +366,9 @@ int16_t Board::materialBalance(Board* board) {
     return materialCount(board, white) - materialCount(board, black);
 }
 
-bool Board::promotionPossible(Board::PieceColor color) const {
-    uint64_t promoRank = color == Board::white ? RANK_7 : RANK_2;
-    return promoRank & getPieceSet(Board::pawns, color);
+bool Board::promotionPossible() const {
+    uint64_t promoRank = m_turn == Board::white ? RANK_7 : RANK_2;
+    return promoRank & getPieceSet(Board::pawns, m_turn);
 }
 
 void Board::clearPosition() {
@@ -380,11 +380,11 @@ void Board::clearPosition() {
     updateEmptyBB(UNIVERSE);
 }
 
-Board::PieceColor Board::loadPosition(std::string& fen) {
+void Board::loadPosition(std::string& fen) {
     std::istringstream is(fen);
     std::string pos, side, castleRights, epTarget, halfMoveClock, fullMoveCounter;
     is >> pos >> side >> castleRights >> epTarget >> halfMoveClock >> fullMoveCounter;
-    PieceColor turn = side == "w" ? white : black;
+    m_turn = side == "w" ? white : black;
 
     std::unordered_map<char, PieceType> typeMap {
         {'P', pawns}, {'N', knights}, {'B', bishops}, {'R', rooks}, {'Q', queens}, {'K', king}
@@ -433,13 +433,11 @@ Board::PieceColor Board::loadPosition(std::string& fen) {
         int file = epTarget[0] - 96, rank = epTarget[1] - '0';
         uint16_t index = 8 * (rank-1) + file-1;
         
-        updateEnPassantTargets(turn, 1ULL<<index);
+        updateEnPassantTargets(m_turn, 1ULL<<index);
     }
 
     m_halfMoveClock = std::stoi(halfMoveClock);
     m_fullMoveCounter = std::stoi(fullMoveCounter);
-
-    return turn;
 }
 
 uint16_t Board::getIndexSquare(std::string square) {
