@@ -1,5 +1,6 @@
 #include "tables.hpp"
 #include <chrono>
+#include <algorithm>
 
 std::array<std::array<uint64_t, NUM_SQUARES>, 2> pawnAttackTable;
 std::array<uint64_t, NUM_SQUARES> kingMoveTable;
@@ -433,6 +434,27 @@ void Tables::clearKiller() {
             move = Move::invalid();
 }
 
+std::array<std::array<std::array<int16_t, NUM_SQUARES>, NUM_SQUARES>, 2> historyTable;
+
+int16_t Tables::historyScore(Board::PieceColor side, uint16_t from, uint16_t to) {
+    return historyTable[side][from][to]; 
+}
+
+void Tables::updateHistory(Board::PieceColor side, uint16_t from, uint16_t to, int16_t bonus) {
+    constexpr int16_t MAX_HISTORY = 16'000;
+    constexpr int16_t MIN_HISTORY = -5'000;
+
+    int16_t clampedBonus = std::clamp(bonus, MIN_HISTORY, MAX_HISTORY);
+    historyTable[side][from][to] += clampedBonus - historyTable[side][from][to] * std::abs(clampedBonus) / MAX_HISTORY;
+}
+
+void Tables::clearHistory() {
+    for(auto& side : historyTable)
+        for(auto& from : side)
+            for(auto& score : from)
+                score = 0;
+}
+
 void Tables::init() {
     initRayAttackTables();
     initPawnAttackTables();
@@ -442,6 +464,7 @@ void Tables::init() {
     initMagicTable();
     initZobristTable();
     clearKiller();
+    clearHistory();
 
     initialized = true;
 }

@@ -27,7 +27,6 @@ private:
     uint16_t m_lastReversible;
     uint16_t m_ply;
     Board m_board;
-    Board::PieceColor m_turn;
     bool m_inCheck;
 
     int m_whiteTime;
@@ -46,8 +45,8 @@ public:
     void makeMove(Move move);
     void unmakeMove(Move move);
 
-    void switchTurn() { m_turn = Board::getOppositeColor(m_turn); m_zobrist ^= Tables::ZTable.blackSide; }
-    const Board::PieceColor getTurn() const { return m_turn; }
+    void switchTurn() { m_board.switchTurn(); m_zobrist ^= Tables::ZTable.blackSide; }
+    const Board::PieceColor getTurn() const { return m_board.getTurn(); }
 
     void loadPosition(std::string fen);
     void loadStartPos() { loadPosition(START_FEN); }
@@ -64,19 +63,19 @@ public:
 
     bool inCheck() const { return m_inCheck; }
     bool isRepetition() const;
-    bool promotionPossible() const { return m_board.promotionPossible(m_turn); }
+    bool promotionPossible() const { return m_board.promotionPossible(); }
 
-    void updateLegalMoves() { m_legalMoves.clear(); MoveGen::getLegalMoves(m_board, m_turn, m_legalMoves, m_ply); }
-    void getLegalMoves(MoveList& moveList) { m_inCheck = MoveGen::getLegalMoves(m_board, m_turn, moveList, m_ply); };
+    void updateLegalMoves() { m_legalMoves.clear(); MoveGen::getLegalMoves(m_board, m_legalMoves, m_ply); }
+    void getLegalMoves(MoveList& moveList) { m_inCheck = MoveGen::getLegalMoves(m_board, moveList, m_ply); };
 
     void updateTime(int wTime, int bTime, int wInc=0, int bInc=0) { m_whiteTime = wTime; m_whiteInc = wInc; m_blackTime = bTime; m_blackInc = bInc; }
-    int getTime() { return m_turn == Board::white ? m_whiteTime : m_blackTime; }
-    int getInc() { return m_turn == Board::white ? m_whiteInc : m_blackInc; }
+    int getTime() { return m_board.getTurn() == Board::white ? m_whiteTime : m_blackTime; }
+    int getInc() { return m_board.getTurn() == Board::white ? m_whiteInc : m_blackInc; }
     
     static uint16_t getRow(uint16_t sq) { return ROW_LEN - sq / ROW_LEN; }
     static uint16_t getCol(uint16_t sq) { return sq % ROW_LEN; }
 
-    static uint64_t calculateZobrist(Board* board, Board::PieceColor turn);
+    static uint64_t calculateZobrist(Board* board);
     static int16_t calculatePstScore(Board* board, Board::PieceColor turn);
     static int getMoveTime(int base, int increment) { return base / 20 + increment / 2; }
 };

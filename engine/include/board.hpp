@@ -10,7 +10,7 @@
 #include "move.hpp"
 
 /*
-Board class encapsulating piece bitboards using little endian rank file mappings
+Board class of piece bitboards using little endian rank file mappings
   H  G  F  E  D  C  B  A
 8 63 62 61 60 59 58 57 56   
 7 55 54 53 52 51 50 49 48
@@ -88,16 +88,6 @@ constexpr int UNDEFINED_SQUARE = 65;
 constexpr int MAX_GAME_LENGTH = 1024;
 
 class Board {
-private:
-    std::array<std::array<uint64_t, NUM_PIECE_TYPES>, 2> m_pieceBB;
-    std::array<uint64_t, 2> m_enPassantTargets;
-    uint64_t m_emptyBB;
-    uint64_t m_occupiedBB;
-    uint16_t m_halfMoveClock;
-    uint16_t m_fullMoveCounter;
-    std::array<bool, 2> m_kingCastleRights;
-    std::array<bool, 2> m_queenCastleRights;
-
 public:
     enum PieceColor : uint8_t {
         white, black
@@ -135,6 +125,7 @@ public:
 
     Board() = default;
 
+    PieceColor getTurn() const { return m_turn; }
     uint64_t getOccupied() const { return m_occupiedBB; }
     uint64_t getEmpty() const { return m_emptyBB; }
     uint64_t getPieceSet(PieceType type, PieceColor color) const { return m_pieceBB[color][type]; }
@@ -149,11 +140,12 @@ public:
     uint64_t attacksTo(uint16_t square, PieceColor color) const;
     uint64_t attackTargets(uint16_t square, PieceType type, PieceColor color) const;
     uint64_t getLeastAttacker(uint64_t attackSet, PieceColor color, PieceType& piece) const;
-    bool promotionPossible(Board::PieceColor color) const;
+    bool promotionPossible() const;
 
     int16_t staticExchangeEvaluation(Move move) const;
     int16_t staticCaptureEvaluation(PieceType attacker, PieceColor oppColor, uint16_t to) const { return getPieceValue(getPieceType(to, oppColor)) - getPieceValue(attacker); }
 
+    void switchTurn() { m_turn = Board::getOppositeColor(m_turn); }
     void updateBB(PieceType type, PieceColor color, uint64_t BB) { m_pieceBB[color][type] = BB; }
     void updateEnPassantTargets(PieceColor color, uint64_t BB) { m_enPassantTargets[color] = BB; }
     void updateKingCastleRights(PieceColor color, bool castleRights) { m_kingCastleRights[color] = castleRights; }
@@ -165,7 +157,7 @@ public:
     void updateEmptyBB(uint64_t BB) { m_emptyBB = BB; }
 
     void clearPosition();
-    PieceColor loadPosition(std::string& fen); //return turn, halfmove and fullmove info for gamestate
+    void loadPosition(std::string& fen);
 
     static uint64_t knightAttackTargets(uint64_t BB);
     static uint64_t kingAttackTargets(uint64_t BB);
@@ -232,4 +224,15 @@ public:
     static std::string getIndexStr(uint16_t index);
     static std::string getMoveString(Move move);
     static void printBitBoard(uint64_t BB);
+
+private:
+    std::array<std::array<uint64_t, NUM_PIECE_TYPES>, 2> m_pieceBB;
+    std::array<uint64_t, 2> m_enPassantTargets;
+    uint64_t m_emptyBB;
+    uint64_t m_occupiedBB;
+    uint16_t m_halfMoveClock;
+    uint16_t m_fullMoveCounter;
+    PieceColor m_turn;
+    std::array<bool, 2> m_kingCastleRights;
+    std::array<bool, 2> m_queenCastleRights;
 };
