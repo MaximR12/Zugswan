@@ -141,6 +141,7 @@ public:
     uint64_t attackTargets(uint16_t square, PieceType type, PieceColor color) const;
     uint64_t getLeastAttacker(uint64_t attackSet, PieceColor color, PieceType& piece) const;
     bool promotionPossible() const;
+    bool pawnEndgame() const;
 
     int16_t staticExchangeEvaluation(Move move) const;
     int16_t staticCaptureEvaluation(PieceType attacker, PieceColor oppColor, uint16_t to) const { return getPieceValue(getPieceType(to, oppColor)) - getPieceValue(attacker); }
@@ -152,6 +153,7 @@ public:
     void updateQueenCastleRights(PieceColor color, bool castleRights) { m_queenCastleRights[color] = castleRights; }
     void updateHalfMoveClock(uint16_t halfMoveClock) { m_halfMoveClock = halfMoveClock; }
     void incrementPly() { ++m_halfMoveClock; ++m_fullMoveCounter; }
+    void decrementPly() { --m_halfMoveClock; --m_fullMoveCounter; }
     void resetHalfMoveClock() { m_halfMoveClock = 0; }
     void updateOccupiedBB(uint64_t BB) { m_occupiedBB = BB; }
     void updateEmptyBB(uint64_t BB) { m_emptyBB = BB; }

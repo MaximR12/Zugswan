@@ -119,6 +119,7 @@ void UCI::bench(std::istringstream& args) {
             double totalTime = 0;
             for(const auto& pos : positionSet) {
                 Tables::TTable.clear();
+                std::cout << "FEN: " << pos << std::endl;
                 state->loadPosition(pos);
                 auto start = std::chrono::high_resolution_clock::now();
                 SearchMetrics metrics = Search::Search<SearchType::depth>(state, limit);
