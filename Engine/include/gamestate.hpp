@@ -44,6 +44,8 @@ public:
 
     void makeMove(Move move);
     void unmakeMove(Move move);
+    void makeNullMove();
+    void unmakeNullMove();
 
     void switchTurn() { m_board.switchTurn(); m_zobrist ^= Tables::ZTable.blackSide; }
     const Board::PieceColor getTurn() const { return m_board.getTurn(); }
@@ -64,6 +66,7 @@ public:
     bool inCheck() const { return m_inCheck; }
     bool isRepetition() const;
     bool promotionPossible() const { return m_board.promotionPossible(); }
+    bool shouldNullSearch() const { return !(m_inCheck || m_board.pawnEndgame()); };
 
     void updateLegalMoves() { m_legalMoves.clear(); MoveGen::getLegalMoves(m_board, m_legalMoves, m_ply); }
     void getLegalMoves(MoveList& moveList) { m_inCheck = MoveGen::getLegalMoves(m_board, moveList, m_ply); };

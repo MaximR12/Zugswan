@@ -173,6 +173,15 @@ int16_t alphaBeta(GameState* state, SearchMetrics& metrics, FixedVector<Move, MA
         move = moveList.pick_move();
     ++metrics.ttTotal;
 
+    constexpr int nullSearchReduction = 4;
+    if(depth >= nullSearchReduction && state->shouldNullSearch()) {
+        state->makeNullMove();
+        int16_t score = -alphaBeta(state, metrics, moveLine, -beta, -(beta-1), depth-nullSearchReduction);
+        state->unmakeNullMove();
+        if(score >= beta)
+            return score;
+    }
+
     FixedVector<Move, MAX_LEGAL_MOVES> quietsSearched;
     NodeType type = NodeType::upper;
     int16_t bestScore = -VALUE_INFINITE;

@@ -256,14 +256,50 @@ void GameState::unmakeMove(Move move) {
     m_board.updateHalfMoveClock(stateInfo.halfMoveClock);
     m_lastReversible = stateInfo.lastReversible;
     
+    switchTurn();
     m_undoStack.pop_back();
     m_hashList.pop_back();
-    switchTurn();
     --m_ply;
 
     assert(m_zobrist == GameState::calculateZobrist(&m_board));
     assert(m_pstScores[Board::white] == GameState::calculatePstScore(&m_board, Board::white)
         && m_pstScores[Board::black] == GameState::calculatePstScore(&m_board, Board::black));
+}
+
+void GameState::makeNullMove() {
+    Board::PieceColor turn = m_board.getTurn();
+
+    m_undoStack.push_back(StateInfo{
+        .epTarget=m_board.getEnPassantTarget(turn),
+    });
+
+    uint64_t epTarget = m_board.getEnPassantTarget(turn);
+    if(epTarget){
+        m_board.updateEnPassantTargets(turn, 0ULL);
+        m_zobrist ^= Tables::ZTable.epFiles[Board::getFile(epTarget)]; 
+    }
+
+    switchTurn();
+    m_hashList.push_back(m_zobrist);
+    m_board.incrementPly();
+    ++m_ply;
+}
+
+void GameState::unmakeNullMove() {
+    StateInfo& stateInfo = m_undoStack.back();
+
+    Board::PieceColor fromColor = Board::getOppositeColor(m_board.getTurn());
+    Board::PieceColor oppColor = m_board.getTurn();
+
+    if(stateInfo.epTarget) 
+        m_zobrist ^= Tables::ZTable.epFiles[Board::getFile(stateInfo.epTarget)];
+    m_board.updateEnPassantTargets(fromColor, stateInfo.epTarget);
+
+    switchTurn();
+    m_board.decrementPly();
+    m_undoStack.pop_back();
+    m_hashList.pop_back();
+    --m_ply;
 }
 
 bool GameState::isRepetition() const {

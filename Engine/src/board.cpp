@@ -371,6 +371,10 @@ bool Board::promotionPossible() const {
     return promoRank & getPieceSet(Board::pawns, m_turn);
 }
 
+bool Board::pawnEndgame() const {
+    return !(getPieceSet(Board::knights, m_turn) || getPieceSet(Board::bishops, m_turn) || getPieceSet(Board::rooks, m_turn) || getPieceSet(Board::queens, m_turn));
+}
+
 void Board::clearPosition() {
     for(int color = 0; color < 2; ++color)
         for(int type = 0; type < NUM_PIECE_TYPES; ++type)
