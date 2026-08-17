@@ -41,8 +41,10 @@ namespace Tables {
     int16_t pstScore(Board::PieceColor side, Board::PieceType type, uint16_t square);
     int16_t historyScore(Board::PieceColor side, uint16_t from, uint16_t to);
     bool isKiller(Move move, uint16_t ply);
+
     void updateHistory(Board::PieceColor side, uint16_t from, uint16_t to, int16_t bonus);
     void insertKiller(Move move, uint16_t ply);
+    
     void clearHistory();
     void clearKiller();
 

@@ -17,12 +17,6 @@ struct Masks {
    uint64_t notInCheck;
 };
 
-//move ordering levels
-constexpr int16_t GOOD_CAPTURE_BASE = 30'000;
-constexpr int16_t KILLER_BASE = 20'000;
-constexpr int16_t QUIET_BASE = 0;
-constexpr int16_t BAD_CAPTURE_BASE = -30'000;
-
 template<Board::PieceColor color, MoveType type>
 int16_t scoreMove(Board& board, Move move, uint16_t ply) {
    if(Move::isCapture(move.getFlag())) {      

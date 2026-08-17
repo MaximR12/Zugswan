@@ -49,6 +49,13 @@ void UCI::go(std::istringstream& args) {
             Search::Search<SearchType::time>(state);
             m_working = false;
         }};
+    } else if (token == "movetime") {
+        int time;
+        args >> time;
+        m_worker = std::thread{[state = m_state, this, time]() {
+            Search::Search<SearchType::movetime>(state, 0, time);
+            m_working = false;
+        }};
     }
 }
 
@@ -161,6 +168,8 @@ void UCI::run() {
             std::cout << "id name Zugswan\nid author Max\nuciok" << std::endl;
         else if(token == "ucinewgame")
             Tables::clear();
+        else if(token == "stop")
+            Search::requestStop();
     } while(token != "quit");
 
     if(m_worker.joinable())

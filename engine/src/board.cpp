@@ -375,6 +375,17 @@ bool Board::pawnEndgame() const {
     return !(getPieceSet(Board::knights, m_turn) || getPieceSet(Board::bishops, m_turn) || getPieceSet(Board::rooks, m_turn) || getPieceSet(Board::queens, m_turn));
 }
 
+bool Board::endgame() const {
+    uint64_t queens = getPieceSet(Board::queens, Board::white) | getPieceSet(Board::queens, Board::black);
+    uint64_t whiteMinors = getPieceSet(Board::knights, Board::white) | getPieceSet(Board::bishops, Board::white) | getPieceSet(Board::rooks, Board::white);
+    uint64_t blackMinors = getPieceSet(Board::knights, Board::black) | getPieceSet(Board::bishops, Board::black) | getPieceSet(Board::rooks, Board::black);
+    
+    uint16_t whiteMinorCount = Board::bitCount(whiteMinors);
+    uint16_t blackMinorCount = Board::bitCount(blackMinors);
+
+    return !queens || (whiteMinorCount <= 1 && blackMinorCount <= 1);
+}
+
 void Board::clearPosition() {
     for(int color = 0; color < 2; ++color)
         for(int type = 0; type < NUM_PIECE_TYPES; ++type)

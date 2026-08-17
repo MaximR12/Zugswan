@@ -67,6 +67,7 @@ public:
     bool isRepetition() const;
     bool promotionPossible() const { return m_board.promotionPossible(); }
     bool shouldNullSearch() const { return !(m_inCheck || m_board.pawnEndgame()); };
+    bool shouldReduce(Move move) const;
 
     void updateLegalMoves() { m_legalMoves.clear(); MoveGen::getLegalMoves(m_board, m_legalMoves, m_ply); }
     void getLegalMoves(MoveList& moveList) { m_inCheck = MoveGen::getLegalMoves(m_board, moveList, m_ply); };
