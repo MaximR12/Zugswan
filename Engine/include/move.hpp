@@ -28,6 +28,12 @@ constexpr uint16_t BISHOP_PROMO_CAPTURE = 0xD;
 constexpr uint16_t ROOK_PROMO_CAPTURE = 0xE;
 constexpr uint16_t QUEEN_PROMO_CAPTURE = 0xF;
 
+//move ordering levels
+constexpr int16_t GOOD_CAPTURE_BASE = 30'000;
+constexpr int16_t KILLER_BASE = 20'000;
+constexpr int16_t QUIET_BASE = 0;
+constexpr int16_t BAD_CAPTURE_BASE = -30'000;
+
 constexpr int MAX_LEGAL_MOVES = 256;
 
 class Move {
@@ -51,6 +57,7 @@ public:
 
     bool isCapture() const { return getFlag()&CAPTURE; }
     bool isPromotion() const { return getFlag()&0x8; }
+    bool isGoodCapture() const { return m_score >= GOOD_CAPTURE_BASE; }
 
     static bool isCapture(uint16_t flag) { return flag&CAPTURE; }
     static bool isPromotion(uint16_t flag) { return flag&0x8; }

@@ -310,6 +310,11 @@ bool GameState::isRepetition() const {
     return false;
 }
 
+bool GameState::shouldReduce(Move move) const {
+    return !(m_inCheck || (m_board.getPieceType(move.getFrom(), m_board.getTurn()) == Board::pawns) 
+        || Tables::isKiller(move, m_ply) || move.isGoodCapture() || move.isPromotion());
+}
+
 void GameState::loadPosition(std::string fen) {
     m_board.loadPosition(fen);
     m_zobrist = GameState::calculateZobrist(&m_board);

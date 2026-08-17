@@ -22,8 +22,11 @@ struct SearchMetrics {
 
 namespace Search {
     template<SearchType type>
-    SearchMetrics Search(GameState* state, int depth=0); 
+    SearchMetrics Search(GameState* state, int depth=0, int movetime=0);
 
-    template SearchMetrics Search<SearchType::depth>(GameState*, int);
-    template SearchMetrics Search<SearchType::time>(GameState*, int);
+    void requestStop();
+
+    template SearchMetrics Search<SearchType::depth>(GameState*, int, int);
+    template SearchMetrics Search<SearchType::time>(GameState*, int, int);
+    template SearchMetrics Search<SearchType::movetime>(GameState*, int, int);
 };

@@ -142,6 +142,7 @@ public:
     uint64_t getLeastAttacker(uint64_t attackSet, PieceColor color, PieceType& piece) const;
     bool promotionPossible() const;
     bool pawnEndgame() const;
+    bool endgame() const;
 
     int16_t staticExchangeEvaluation(Move move) const;
     int16_t staticCaptureEvaluation(PieceType attacker, PieceColor oppColor, uint16_t to) const { return getPieceValue(getPieceType(to, oppColor)) - getPieceValue(attacker); }
@@ -216,6 +217,7 @@ public:
     static int16_t materialBalance(Board* board); //positive for white material advantage, negative for black material advantage
 
     static int getFile(uint64_t BB);
+    static uint16_t bitCount(uint64_t BB) { return std::popcount(BB); }
     static uint16_t bitScan(uint64_t BB, bool reverse);
     static uint16_t bitScanForward(uint64_t BB) { assert(BB != 0); return std::countr_zero(BB); }
     static uint16_t bitScanReverse(uint64_t BB) { assert(BB != 0); return 63 - std::countl_zero(BB); }
