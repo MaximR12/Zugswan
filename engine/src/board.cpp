@@ -324,6 +324,10 @@ Board::PieceType Board::getPieceType(uint16_t ind, PieceColor color) const {
     return invalid;
 }
 
+uint16_t Board::getPieceCount(PieceType type, PieceColor color) const {
+    return bitCount(getPieceSet(type, color));
+}
+
 uint16_t Board::bitScan(uint64_t BB, bool reverse) {
     assert(BB != 0);
     uint64_t rMask = 0ULL - static_cast<uint64_t>(reverse);
@@ -340,8 +344,16 @@ uint16_t Board::serializeBitboard(uint64_t BB, std::array<uint16_t, NUM_SQUARES>
     return count;
 }
 
-const std::unordered_map<int, int16_t> valueMap {
-    {Board::pawns, 100}, {Board::knights, 320}, {Board::bishops, 330}, {Board::rooks, 500}, {Board::queens, 900}, {Board::king, VALUE_INFINITE}
+constexpr std::array<int16_t, 5> phaseMap {
+    0, 1, 1, 2, 4
+};
+
+int16_t Board::getPiecePhase(int type) {
+    return phaseMap.at(type);
+}
+
+constexpr std::array<int16_t, 6> valueMap {
+    100, 320, 330, 500, 900, VALUE_INFINITE
 };
 
 int16_t Board::getPieceValue(int type) {

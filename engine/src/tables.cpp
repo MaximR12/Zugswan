@@ -404,12 +404,13 @@ const std::array<int16_t, NUM_SQUARES> kingEndPST = {
    -50,-30,-30,-30,-30,-30,-30,-50
 };
 
-const std::array<std::array<int16_t, NUM_SQUARES>, PIECE_TYPES> pieceSquareTables = {
-    pawnPST, knightPST, bishopPST, rookPST, queenPST, kingMiddlePST
-};
+const std::array<std::array<std::array<int16_t, NUM_SQUARES>, PIECE_TYPES>, NUM_PHASES> pieceSquareTables = {{
+    {pawnPST, knightPST, bishopPST, rookPST, queenPST, kingMiddlePST},
+    {pawnPST, knightPST, bishopPST, rookPST, queenPST, kingEndPST}
+}};
 
-int16_t Tables::pstScore(Board::PieceColor side, Board::PieceType type, uint16_t square) {
-    return side == Board::white ? pieceSquareTables[type][square^56] : pieceSquareTables[type][square];  
+int16_t Tables::pstScore(Board::Phase phase, Board::PieceColor side, Board::PieceType type, uint16_t square) {
+    return side == Board::white ? pieceSquareTables[phase][type][square^56] : pieceSquareTables[phase][type][square];  
 }
 
 std::array<std::array<Move, KILLERS_PER_PLY>, MAX_GAME_LENGTH> killerTable;

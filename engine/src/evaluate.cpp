@@ -10,8 +10,14 @@ int16_t Eval::evaluate(GameState* state) {
 
     int16_t sideMultiple = getSideMultiple(state->getTurn());
     int16_t materialBalance = Board::materialBalance(state->getBoard());
-    int16_t pstScore = state->getPst(Board::white) - state->getPst(Board::black);
+
+    int16_t pstScoreMid = state->getPst(Board::middle, Board::white) - state->getPst(Board::middle, Board::black);
+    int16_t pstScoreEnd = state->getPst(Board::end, Board::white) - state->getPst(Board::end, Board::black);
+    int16_t phase = state->getPhase();
+ 
+    int16_t evalMid = static_cast<int16_t>(materialBalance * materialWeight + pstScoreMid * pstWeight);
+    int16_t evalEnd = static_cast<int16_t>(materialBalance * materialWeight + pstScoreEnd * pstWeight);
+    int16_t eval = ((evalMid * (256 - phase)) + (evalEnd * phase)) / 256;
     
-    int16_t eval = static_cast<int16_t>(materialBalance * materialWeight + pstScore * pstWeight);
     return eval * sideMultiple;
 }

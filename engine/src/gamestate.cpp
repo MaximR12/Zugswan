@@ -34,22 +34,28 @@ void GameState::movePiece(Board::PieceType type, Board::PieceColor color, uint64
     m_board.updateBB(type, color, m_board.getPieceSet(type, color) ^ fromToBB);
     m_zobrist ^= Tables::ZTable.pieces[type+(color*PIECE_TYPES)][from];
     m_zobrist ^= Tables::ZTable.pieces[type+(color*PIECE_TYPES)][to];
-    m_pstScores[color] -= Tables::pstScore(color, type, from);
-    m_pstScores[color] += Tables::pstScore(color, type, to);
+    m_pstScores[Board::middle][color] -= Tables::pstScore(Board::middle, color, type, from);
+    m_pstScores[Board::middle][color] += Tables::pstScore(Board::middle, color, type, to);
+    m_pstScores[Board::end][color] -= Tables::pstScore(Board::end, color, type, from);
+    m_pstScores[Board::end][color] += Tables::pstScore(Board::end, color, type, to);
 }
 
 void GameState::removePiece(Board::PieceType type, Board::PieceColor color, uint64_t pieceBB, uint16_t square) {
     m_board.updateBB(Board::all, color, m_board.getPieceSet(Board::all, color) ^ pieceBB);
     m_board.updateBB(type, color, m_board.getPieceSet(type, color) ^ pieceBB);
     m_zobrist ^= Tables::ZTable.pieces[type+(color*PIECE_TYPES)][square];
-    m_pstScores[color] -= Tables::pstScore(color, type, square);
+    m_pstScores[Board::middle][color] -= Tables::pstScore(Board::middle, color, type, square);
+    m_pstScores[Board::end][color] -= Tables::pstScore(Board::end, color, type, square);
+    m_phase += Board::getPiecePhase(type);
 }
 
 void GameState::addPiece(Board::PieceType type, Board::PieceColor color, uint64_t pieceBB, uint16_t square) {
     m_board.updateBB(Board::all, color, m_board.getPieceSet(Board::all, color) | pieceBB);
     m_board.updateBB(type, color, m_board.getPieceSet(type, color) | pieceBB);
     m_zobrist ^= Tables::ZTable.pieces[type+(color*PIECE_TYPES)][square];
-    m_pstScores[color] += Tables::pstScore(color, type, square);
+    m_pstScores[Board::middle][color] += Tables::pstScore(Board::middle, color, type, square);
+    m_pstScores[Board::end][color] += Tables::pstScore(Board::end, color, type, square);
+    m_phase -= Board::getPiecePhase(type);
 }
 
 void GameState::makeMove(Move move) {
@@ -135,8 +141,13 @@ void GameState::makeMove(Move move) {
 
             m_zobrist ^= Tables::ZTable.pieces[Board::pawns+(turn*PIECE_TYPES)][toInd];
             m_zobrist ^= Tables::ZTable.pieces[promoType+(turn*PIECE_TYPES)][toInd];
-            m_pstScores[turn] -= Tables::pstScore(turn, Board::pawns, toInd);
-            m_pstScores[turn] += Tables::pstScore(turn, promoType, toInd);
+
+            m_pstScores[Board::middle][turn] -= Tables::pstScore(Board::middle, turn, Board::pawns, toInd);
+            m_pstScores[Board::middle][turn] += Tables::pstScore(Board::middle, turn, promoType, toInd);
+            m_pstScores[Board::end][turn] -= Tables::pstScore(Board::end, turn, Board::pawns, toInd);
+            m_pstScores[Board::end][turn] += Tables::pstScore(Board::end, turn, promoType, toInd);
+
+            m_phase -= Board::getPiecePhase(promoType);
         }
     } else if(flag == KING_CASTLE) {
         setLastReversible();
@@ -170,8 +181,6 @@ void GameState::makeMove(Move move) {
     ++m_ply;
 
     assert(m_zobrist == GameState::calculateZobrist(&m_board));
-    assert(m_pstScores[Board::white] == GameState::calculatePstScore(&m_board, Board::white)
-        && m_pstScores[Board::black] == GameState::calculatePstScore(&m_board, Board::black));
 }
 
 void GameState::unmakeMove(Move move) {
@@ -262,8 +271,6 @@ void GameState::unmakeMove(Move move) {
     --m_ply;
 
     assert(m_zobrist == GameState::calculateZobrist(&m_board));
-    assert(m_pstScores[Board::white] == GameState::calculatePstScore(&m_board, Board::white)
-        && m_pstScores[Board::black] == GameState::calculatePstScore(&m_board, Board::black));
 }
 
 void GameState::makeNullMove() {
@@ -315,17 +322,24 @@ bool GameState::shouldReduce(Move move) const {
         || Tables::isKiller(move, m_ply) || move.isGoodCapture() || move.isPromotion());
 }
 
+void GameState::setPst() {
+    m_pstScores[Board::middle][Board::white] = GameState::calculatePstScore(&m_board, Board::middle, Board::white);
+    m_pstScores[Board::middle][Board::black] = GameState::calculatePstScore(&m_board, Board::middle, Board::black);
+    m_pstScores[Board::end][Board::white] = GameState::calculatePstScore(&m_board, Board::end, Board::white);
+    m_pstScores[Board::end][Board::black] = GameState::calculatePstScore(&m_board, Board::end, Board::black);
+}
+
 void GameState::loadPosition(std::string fen) {
     m_board.loadPosition(fen);
     m_zobrist = GameState::calculateZobrist(&m_board);
-    m_pstScores[Board::white] = GameState::calculatePstScore(&m_board, Board::white);
-    m_pstScores[Board::black] = GameState::calculatePstScore(&m_board, Board::black);
+    m_phase = GameState::calculatePhase(&m_board);
     m_lastReversible = 0;
     m_ply = 0;
     m_undoStack.clear();
     m_hashList.clear();
     m_hashList.push_back(m_zobrist);
     updateLegalMoves();
+    setPst();
 }
 
 void GameState::moveFromList(std::vector<std::string>& moveList) {
@@ -353,14 +367,25 @@ void GameState::moveFromList(std::vector<std::string>& moveList) {
     }
 }
 
-int16_t GameState::calculatePstScore(Board* board, Board::PieceColor turn) {
+int16_t GameState::calculatePhase(Board* board) {
+    int16_t phase = totalPhase;
+    for(int type = Board::pawns; type < Board::king; ++type) {
+        Board::PieceType pieceType = static_cast<Board::PieceType>(type);
+        int16_t totalCount = (board->getPieceCount(pieceType, Board::white) + board->getPieceCount(pieceType, Board::black));
+        phase -= Board::getPiecePhase(type) * (board->getPieceCount(pieceType, Board::white) + board->getPieceCount(pieceType, Board::black));
+    }
+
+    return phase;
+}
+
+int16_t GameState::calculatePstScore(Board* board, Board::Phase phase, Board::PieceColor turn) {
     int16_t pst = 0;
     for(int pt = Board::pawns; pt <= Board::king; ++pt) {
         Board::PieceType pieceType = static_cast<Board::PieceType>(pt);
         std::array<uint16_t, NUM_SQUARES> indBuf;
         size_t numPieces = Board::serializeBitboard(board->getPieceSet(pieceType, turn), indBuf);
         for(int i = 0; i < numPieces; ++i) 
-            pst += Tables::pstScore(turn, pieceType, indBuf[i]);
+            pst += Tables::pstScore(phase, turn, pieceType, indBuf[i]);
     }
 
     return pst;
