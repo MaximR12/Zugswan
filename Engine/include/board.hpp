@@ -123,6 +123,10 @@ public:
         hor, ver, diag, anti
     };
 
+    enum Phase {
+        middle, end
+    };
+
     Board() = default;
 
     PieceColor getTurn() const { return m_turn; }
@@ -137,6 +141,7 @@ public:
     uint16_t getHalfMoveClock() const { return m_halfMoveClock; }
     PieceColor getPieceColor(uint16_t ind) const { assert(ind >= 0 && ind < NUM_SQUARES); return m_pieceBB[white][all]&(1ULL<<ind) ? white : black; }
     PieceType getPieceType(uint16_t ind, PieceColor color) const;
+    uint16_t getPieceCount(PieceType type, PieceColor color) const;
     uint64_t attacksTo(uint16_t square, PieceColor color) const;
     uint64_t attackTargets(uint16_t square, PieceType type, PieceColor color) const;
     uint64_t getLeastAttacker(uint64_t attackSet, PieceColor color, PieceType& piece) const;
@@ -212,6 +217,7 @@ public:
     static Directions getOppositeDirection(Directions dir);
     static PieceColor getOppositeColor(PieceColor color) { return static_cast<Board::PieceColor>(color ^ 1); }
     static bool isNegative(Directions dir);
+    static int16_t getPiecePhase(int type);
     static int16_t getPieceValue(int type);
     static int16_t getPieceValue(PieceType type);
     static int16_t materialBalance(Board* board); //positive for white material advantage, negative for black material advantage

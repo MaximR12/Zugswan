@@ -24,6 +24,7 @@ constexpr size_t PIECE_TYPES = 6;
 constexpr size_t FILES = 8;
 
 constexpr int KILLERS_PER_PLY = 2;
+constexpr int NUM_PHASES = 2;
 
 namespace Tables {
     inline Random rand;
@@ -38,7 +39,7 @@ namespace Tables {
     uint64_t bishopAttacks(uint16_t square, uint64_t occupied);
     uint64_t rookAttacks(uint16_t square, uint64_t occupied);
 
-    int16_t pstScore(Board::PieceColor side, Board::PieceType type, uint16_t square);
+    int16_t pstScore(Board::Phase phase, Board::PieceColor side, Board::PieceType type, uint16_t square);
     int16_t historyScore(Board::PieceColor side, uint16_t from, uint16_t to);
     bool isKiller(Move move, uint16_t ply);
 
