@@ -113,17 +113,17 @@ public:
         numCastleRights = 16
     };
 
-    enum Directions {
+    enum Directions : uint8_t {
         north, south, east, west, northWest, northEast, southWest, southEast, 
         northNorthEast, northEastEast, northNorthWest, northWestWest,
         southSouthEast, southEastEast, southSouthWest, southWestWest
     };
 
-    enum SliderRays {
+    enum SliderRays : uint8_t {
         hor, ver, diag, anti
     };
 
-    enum Phase {
+    enum Phase : uint8_t {
         middle, end
     };
 
@@ -142,12 +142,13 @@ public:
     PieceColor getPieceColor(uint16_t ind) const { assert(ind >= 0 && ind < NUM_SQUARES); return m_pieceBB[white][all]&(1ULL<<ind) ? white : black; }
     PieceType getPieceType(uint16_t ind, PieceColor color) const;
     uint16_t getPieceCount(PieceType type, PieceColor color) const;
+    
     uint64_t attacksTo(uint16_t square, PieceColor color) const;
     uint64_t attackTargets(uint16_t square, PieceType type, PieceColor color) const;
     uint64_t getLeastAttacker(uint64_t attackSet, PieceColor color, PieceType& piece) const;
+
     bool promotionPossible() const;
     bool pawnEndgame() const;
-    bool endgame() const;
 
     int16_t staticExchangeEvaluation(Move move) const;
     int16_t staticCaptureEvaluation(PieceType attacker, PieceColor oppColor, uint16_t to) const { return getPieceValue(getPieceType(to, oppColor)) - getPieceValue(attacker); }
@@ -222,7 +223,9 @@ public:
     static int16_t getPieceValue(PieceType type);
     static int16_t materialBalance(Board* board); //positive for white material advantage, negative for black material advantage
 
+    static uint64_t getFileMask(uint64_t BB);
     static int getFile(uint64_t BB);
+    static int getRank(uint64_t BB);
     static uint16_t bitCount(uint64_t BB) { return std::popcount(BB); }
     static uint16_t bitScan(uint64_t BB, bool reverse);
     static uint16_t bitScanForward(uint64_t BB) { assert(BB != 0); return std::countr_zero(BB); }

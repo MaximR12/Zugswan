@@ -20,18 +20,24 @@ constexpr int16_t totalPhase = 24;
 
 class GameState {
 private:
+    //state stacks
     FixedVector<uint64_t, MAX_GAME_LENGTH> m_hashList;
     FixedVector<StateInfo, MAX_GAME_LENGTH> m_undoStack;
-    MoveList m_legalMoves;
     
+    //eval info
     std::array<std::array<int16_t, 2>, NUM_PHASES> m_pstScores;
+    uint64_t m_pawnHash;
+    int16_t m_phase;
+
+    //position state
+    MoveList m_legalMoves;
+    Board m_board;
     uint64_t m_zobrist;
     uint16_t m_lastReversible;
     uint16_t m_ply;
-    int16_t m_phase;
-    Board m_board;
     bool m_inCheck;
 
+    //time info
     int m_whiteTime;
     int m_whiteInc;
     int m_blackTime;
@@ -59,6 +65,7 @@ public:
 
     Board* getBoard() { return &m_board; }
     uint64_t getZobrist() { return m_zobrist; }
+    uint64_t getPawnHash() { return m_pawnHash; }
     int16_t getPst(Board::Phase phase, Board::PieceColor color) { return m_pstScores[phase][color]; }
     int16_t getSEE(Move move) const { return m_board.staticExchangeEvaluation(move); }
     uint16_t getPly() const { return m_ply; }
@@ -84,8 +91,10 @@ public:
     static uint16_t getRow(uint16_t sq) { return ROW_LEN - sq / ROW_LEN; }
     static uint16_t getCol(uint16_t sq) { return sq % ROW_LEN; }
 
-    static uint64_t calculateZobrist(Board* board);
-    static int16_t calculatePstScore(Board* board, Board::Phase phase, Board::PieceColor turn);
-    static int16_t calculatePhase(Board* board);
+    static uint64_t calculateZobrist(Board& board);
+    static uint64_t calculatePawnHash(Board& board);
+    static int16_t calculatePstScore(Board& board, Board::Phase phase, Board::PieceColor turn);
+    static int16_t calculatePhase(Board& board);
+    static int16_t evaluatePawnStructure(Board& board);
     static int getMoveTime(int base, int increment) { return base / 20 + increment / 2; }
 };

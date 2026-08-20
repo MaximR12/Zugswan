@@ -3,7 +3,7 @@
 
 class GameState;
 
-constexpr int MAX_SEARCH_DEPTH = 32;
+constexpr int MAX_SEARCH_DEPTH = 64;
 
 constexpr int16_t VALUE_MATE = 30'000;
 constexpr int16_t VALUE_DRAW = 0;

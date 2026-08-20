@@ -26,7 +26,7 @@ uint64_t Board::attackTargets(uint16_t square, PieceType type, PieceColor color)
         case(Board::pawns):
             return color == Board::white ? whitePawnTargets(1ULL<<square) : blackPawnTargets(1ULL<<square);
         case(Board::knights):
-            return knightAttackTargets(1ULL<<square);
+            return Tables::knightMoves(square);
         case(Board::bishops):
             return Tables::bishopAttacks(square, m_occupiedBB);
         case(Board::rooks):
@@ -34,7 +34,7 @@ uint64_t Board::attackTargets(uint16_t square, PieceType type, PieceColor color)
         case(Board::queens):
             return Tables::bishopAttacks(square, m_occupiedBB) | Tables::rookAttacks(square, m_occupiedBB);
         case(Board::king):
-            return kingAttackTargets(1ULL<<square);
+            return Tables::kingMoves(square);
         default:
             return 0ULL;
     }
@@ -301,6 +301,19 @@ uint64_t Board::southWestFill(uint64_t sliders, uint64_t empty) {
     return shift<Board::southWest>(sliders);
 }
 
+uint64_t Board::getFileMask(uint64_t BB) {
+    assert(BB && !(BB & (BB - 1))); //assert singly occupied bitboard
+
+    uint64_t fileMask = A_FILE;
+    for(int file = 0; file < 8; ++file) {
+        if(fileMask & BB)
+            return fileMask;
+        fileMask <<= 1;
+    }
+
+    return -1;
+}
+
 int Board::getFile(uint64_t BB) {
     assert(BB && !(BB & (BB - 1))); //assert singly occupied bitboard
 
@@ -309,6 +322,19 @@ int Board::getFile(uint64_t BB) {
         if(fileMask & BB)
             return file;
         fileMask <<= 1;
+    }
+
+    return -1;
+}
+
+int Board::getRank(uint64_t BB) {
+    assert(BB && !(BB & (BB - 1))); //assert singly occupied bitboard
+
+    uint64_t rankMask = RANK_1;
+    for(int rank = 0; rank < 8; ++rank) {
+        if(rankMask & BB)
+            return rank;
+        rankMask <<= 8;
     }
 
     return -1;
@@ -385,17 +411,6 @@ bool Board::promotionPossible() const {
 
 bool Board::pawnEndgame() const {
     return !(getPieceSet(Board::knights, m_turn) || getPieceSet(Board::bishops, m_turn) || getPieceSet(Board::rooks, m_turn) || getPieceSet(Board::queens, m_turn));
-}
-
-bool Board::endgame() const {
-    uint64_t queens = getPieceSet(Board::queens, Board::white) | getPieceSet(Board::queens, Board::black);
-    uint64_t whiteMinors = getPieceSet(Board::knights, Board::white) | getPieceSet(Board::bishops, Board::white) | getPieceSet(Board::rooks, Board::white);
-    uint64_t blackMinors = getPieceSet(Board::knights, Board::black) | getPieceSet(Board::bishops, Board::black) | getPieceSet(Board::rooks, Board::black);
-    
-    uint16_t whiteMinorCount = Board::bitCount(whiteMinors);
-    uint16_t blackMinorCount = Board::bitCount(blackMinors);
-
-    return !queens || (whiteMinorCount <= 1 && blackMinorCount <= 1);
 }
 
 void Board::clearPosition() {
