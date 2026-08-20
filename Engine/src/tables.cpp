@@ -327,15 +327,26 @@ void initZobristTable() {
     ZTable.blackSide = Tables::rand.getRand();
 }
 
-const std::array<int16_t, NUM_SQUARES> pawnPST = {
-   0,  0,  0,  0,  0,  0,  0,  0,
-   50, 50, 50, 50, 50, 50, 50, 50,
-   10, 10, 20, 30, 30, 20, 10, 10,
-   5,  5, 10, 25, 25, 10,  5,  5,
-   0,  0,  0, 20, 20,  0,  0,  0,
-   5, -5,-10,  0,  0,-10, -5,  5,
-   5, 10, 10,-20,-20, 10, 10,  5,
-   0,  0,  0,  0,  0,  0,  0,  0
+const std::array<int16_t, NUM_SQUARES> pawnMiddlePST = {
+    0,  0,  0,  0,  0,  0,  0,  0,
+    50, 50, 50, 50, 50, 50, 50, 50,
+    10, 10, 20, 30, 30, 20, 10, 10,
+    5,  5, 10, 25, 25, 10,  5,  5,
+    0,  0,  0, 20, 20,  0,  0,  0,
+    5, -5,-10,  0,  0,-10, -5,  5,
+    5, 10, 10,-20,-20, 10, 10,  5,
+    0,  0,  0,  0,  0,  0,  0,  0
+};
+
+const std::array<int16_t, NUM_SQUARES> pawnEndPST = {
+    0,  0,  0,  0,  0,  0,  0,  0,
+    40, 70, 70, 70, 70, 70, 70, 40,
+    15, 20, 25, 30, 30, 25, 20, 15,
+    0,   5, 10, 25, 25, 10,  5,  5,
+   -6,  -3,  0,  0,  0,  0, -3, -6,
+   -10, -7, -5, -5, -5, -5, -7,-10,
+   -15,-12,-10,-10,-10,-10,-12,-15,
+    0,  0,  0,  0,  0,  0,  0,  0
 };
 
 const std::array<int16_t, NUM_SQUARES> knightPST = {
@@ -405,8 +416,8 @@ const std::array<int16_t, NUM_SQUARES> kingEndPST = {
 };
 
 const std::array<std::array<std::array<int16_t, NUM_SQUARES>, PIECE_TYPES>, NUM_PHASES> pieceSquareTables = {{
-    {pawnPST, knightPST, bishopPST, rookPST, queenPST, kingMiddlePST},
-    {pawnPST, knightPST, bishopPST, rookPST, queenPST, kingEndPST}
+    {pawnMiddlePST, knightPST, bishopPST, rookPST, queenPST, kingMiddlePST},
+    {pawnEndPST, knightPST, bishopPST, rookPST, queenPST, kingEndPST}
 }};
 
 int16_t Tables::pstScore(Board::Phase phase, Board::PieceColor side, Board::PieceType type, uint16_t square) {

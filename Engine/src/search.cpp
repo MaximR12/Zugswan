@@ -123,7 +123,7 @@ int16_t quiescenceSearch(GameState* state, SearchMetrics& metrics, int16_t alpha
     return bestScore;
 }
 
-int16_t alphaBeta(GameState* state, SearchMetrics& metrics, FixedVector<Move, MAX_SEARCH_DEPTH>& prevMoveLine, int16_t alpha, int16_t beta, int depth) {
+int16_t alphaBeta(GameState* state, SearchMetrics& metrics, FixedVector<Move, MAX_SEARCH_DEPTH>& prevMoveLine, int16_t alpha, int16_t beta, int depth, int ply) {
     if(stopRequested.load(std::memory_order_relaxed))
         return alpha;
 
@@ -137,10 +137,10 @@ int16_t alphaBeta(GameState* state, SearchMetrics& metrics, FixedVector<Move, MA
 
     if(moveList.size() == 0) { //check mate / stalemate
         prevMoveLine.clear();
-        return state->inCheck() ? -VALUE_MATE : VALUE_DRAW;
+        return state->inCheck() ? (-VALUE_MATE + ply) : VALUE_DRAW;
     }
 
-    if(state->getHalfMoveClock() >= 100 || state->isRepetition()) { //check 50 move rule / three move repitition
+    if(ply != 0 && (state->getHalfMoveClock() >= 100 || state->isRepetition())) { //check 50 move rule / three move repitition
         if(VALUE_DRAW < beta)
             prevMoveLine.clear();
         return VALUE_DRAW;
@@ -180,7 +180,7 @@ int16_t alphaBeta(GameState* state, SearchMetrics& metrics, FixedVector<Move, MA
     constexpr int nullSearchReduction = 4;
     if(depth >= nullSearchReduction && state->shouldNullSearch()) {
         state->makeNullMove();
-        int16_t score = -alphaBeta(state, metrics, moveLine, -beta, -(beta-1), depth-nullSearchReduction);
+        int16_t score = -alphaBeta(state, metrics, moveLine, -beta, -(beta-1), depth-nullSearchReduction, ply+1);
         state->unmakeNullMove();
         if(score >= beta)
             return score;
@@ -202,11 +202,11 @@ int16_t alphaBeta(GameState* state, SearchMetrics& metrics, FixedVector<Move, MA
         int16_t score;
         constexpr int fullDepthMoves = 4, reductionLimit = 3;
         if(movesSearched < fullDepthMoves || depth < reductionLimit)
-            score = -alphaBeta(state, metrics, moveLine, -beta, -alpha, depth-1);
+            score = -alphaBeta(state, metrics, moveLine, -beta, -alpha, depth-1, ply+1);
         else {
-            score = -alphaBeta(state, metrics, moveLine, -beta, -alpha, depth-2);
+            score = -alphaBeta(state, metrics, moveLine, -beta, -alpha, depth-2, ply+1);
             if(score > alpha)
-                score = -alphaBeta(state, metrics, moveLine, -beta, -alpha, depth-1);
+                score = -alphaBeta(state, metrics, moveLine, -beta, -alpha, depth-1, ply+1);
         }
 
         state->unmakeMove(move);
@@ -257,7 +257,7 @@ void iterativeDeepening(GameState* state, FixedVector<Move, MAX_SEARCH_DEPTH>& m
 
     int16_t score = 0, alpha = -VALUE_INFINITE, beta = VALUE_INFINITE;
     for(int ply = 1; ply <= depth; ++ply) {
-        if(score == -VALUE_MATE || score == VALUE_MATE) //exit early if forced mate
+        if(score <= -VALUE_MATE + MAX_SEARCH_DEPTH || score >= VALUE_MATE - MAX_SEARCH_DEPTH) //exit early if forced mate
             break;
 
         SearchMetrics currMetrics;
@@ -268,7 +268,7 @@ void iterativeDeepening(GameState* state, FixedVector<Move, MAX_SEARCH_DEPTH>& m
         int16_t delta = ASPIRATION_WIDTH / 2;
         while(!stopRequested) {
             assert(alpha >= -VALUE_INFINITE && beta <= VALUE_INFINITE);
-            score = alphaBeta(state, currMetrics, currMoveLine, alpha, beta, ply);
+            score = alphaBeta(state, currMetrics, currMoveLine, alpha, beta, ply, 0);
         
             if(score <= alpha) { //failed low
                 alpha = std::max(-VALUE_INFINITE, score - delta);

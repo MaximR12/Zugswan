@@ -55,9 +55,9 @@ namespace Tables {
         std::array<uint64_t, FILES> epFiles;
         uint64_t blackSide; 
     } ZTable;
-
     inline TranspositionTable TTable;
+    inline PawnTable PTable;
 
     void init();
-    inline void clear() { clearHistory(); clearKiller(); TTable.clear(); }
+    inline void clear() { clearHistory(); clearKiller(); TTable.clear(); PTable.clear(); }
 }
