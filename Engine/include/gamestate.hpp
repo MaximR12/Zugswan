@@ -26,6 +26,7 @@ private:
     
     //eval info
     std::array<std::array<int16_t, 2>, NUM_PHASES> m_pstScores;
+    std::array<int16_t, 2> m_tropism;
     uint64_t m_pawnHash;
     int16_t m_phase;
 
@@ -67,6 +68,7 @@ public:
     uint64_t getZobrist() { return m_zobrist; }
     uint64_t getPawnHash() { return m_pawnHash; }
     int16_t getPst(Board::Phase phase, Board::PieceColor color) { return m_pstScores[phase][color]; }
+    int16_t getTropism(Board::PieceColor color) { return m_tropism[color]; }
     int16_t getSEE(Move move) const { return m_board.staticExchangeEvaluation(move); }
     uint16_t getPly() const { return m_ply; }
     int16_t getPhase() const { return (m_phase * 256 + (totalPhase / 2)) / totalPhase; }
@@ -94,6 +96,7 @@ public:
     static uint64_t calculateZobrist(Board& board);
     static uint64_t calculatePawnHash(Board& board);
     static int16_t calculatePstScore(Board& board, Board::Phase phase, Board::PieceColor turn);
+    static int16_t calculateTropism(Board& board, Board::PieceColor turn);
     static int16_t calculatePhase(Board& board);
     static int16_t evaluatePawnStructure(Board& board);
     static int getMoveTime(int base, int increment) { return base / 20 + increment / 2; }

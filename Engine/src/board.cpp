@@ -370,6 +370,15 @@ uint16_t Board::serializeBitboard(uint64_t BB, std::array<uint16_t, NUM_SQUARES>
     return count;
 }
 
+constexpr std::array<int16_t, 6> pieceTropMap {
+    0, 3, 2, 2, 4, 0
+};
+
+int16_t Board::getPieceTropism(PieceType type, int distance) {
+    constexpr int CENTER_DISTANCE = 7;
+    return (CENTER_DISTANCE - distance) * pieceTropMap[type];
+}
+
 constexpr std::array<int16_t, 5> phaseMap {
     0, 1, 1, 2, 4
 };

@@ -32,38 +32,61 @@ void updateOccupied(Board& board, uint64_t occupied) {
 void GameState::movePiece(Board::PieceType type, Board::PieceColor color, uint64_t fromToBB, uint16_t from, uint16_t to) {
     m_board.updateBB(Board::all, color, m_board.getPieceSet(Board::all, color) ^ fromToBB);
     m_board.updateBB(type, color, m_board.getPieceSet(type, color) ^ fromToBB);
+    
     m_zobrist ^= Tables::ZTable.pieces[type+(color*PIECE_TYPES)][from];
     m_zobrist ^= Tables::ZTable.pieces[type+(color*PIECE_TYPES)][to];
-    if(type == Board::pawns || type == Board::king) {
-        m_pawnHash ^= Tables::ZTable.pieces[type+(color*PIECE_TYPES)][from];
-        m_pawnHash ^= Tables::ZTable.pieces[type+(color*PIECE_TYPES)][to];
-    }
     m_pstScores[Board::middle][color] -= Tables::pstScore(Board::middle, color, type, from);
     m_pstScores[Board::middle][color] += Tables::pstScore(Board::middle, color, type, to);
     m_pstScores[Board::end][color] -= Tables::pstScore(Board::end, color, type, from);
     m_pstScores[Board::end][color] += Tables::pstScore(Board::end, color, type, to);
+    
+    if(type == Board::pawns || type == Board::king) {
+        m_pawnHash ^= Tables::ZTable.pieces[type+(color*PIECE_TYPES)][from];
+        m_pawnHash ^= Tables::ZTable.pieces[type+(color*PIECE_TYPES)][to];
+        if(type == Board::king)
+            m_tropism[Board::getOppositeColor(color)] = GameState::calculateTropism(m_board, Board::getOppositeColor(color));
+        return;
+    }
+
+    uint16_t kingInd = Board::serializeSingleBit(m_board.getPieceSet(Board::king, Board::getOppositeColor(color)));
+    m_tropism[color] -= Board::getPieceTropism(type, Tables::lookupDistance(kingInd, from));
+    m_tropism[color] += Board::getPieceTropism(type, Tables::lookupDistance(kingInd, to));
 }
 
 void GameState::removePiece(Board::PieceType type, Board::PieceColor color, uint64_t pieceBB, uint16_t square) {
     m_board.updateBB(Board::all, color, m_board.getPieceSet(Board::all, color) ^ pieceBB);
     m_board.updateBB(type, color, m_board.getPieceSet(type, color) ^ pieceBB);
+
     m_zobrist ^= Tables::ZTable.pieces[type+(color*PIECE_TYPES)][square];
-    if(type == Board::pawns || type == Board::king) 
-        m_pawnHash ^= Tables::ZTable.pieces[type+(color*PIECE_TYPES)][square];
     m_pstScores[Board::middle][color] -= Tables::pstScore(Board::middle, color, type, square);
     m_pstScores[Board::end][color] -= Tables::pstScore(Board::end, color, type, square);
     m_phase += Board::getPiecePhase(type);
+
+    if(type == Board::pawns || type == Board::king) {
+        m_pawnHash ^= Tables::ZTable.pieces[type+(color*PIECE_TYPES)][square];
+        return;
+    }
+
+    uint16_t kingInd = Board::serializeSingleBit(m_board.getPieceSet(Board::king, Board::getOppositeColor(color)));
+    m_tropism[color] -= Board::getPieceTropism(type, Tables::lookupDistance(kingInd, square));
 }
 
 void GameState::addPiece(Board::PieceType type, Board::PieceColor color, uint64_t pieceBB, uint16_t square) {
     m_board.updateBB(Board::all, color, m_board.getPieceSet(Board::all, color) | pieceBB);
     m_board.updateBB(type, color, m_board.getPieceSet(type, color) | pieceBB);
+
     m_zobrist ^= Tables::ZTable.pieces[type+(color*PIECE_TYPES)][square];
-    if(type == Board::pawns || type == Board::king)
-        m_pawnHash ^= Tables::ZTable.pieces[type+(color*PIECE_TYPES)][square];
     m_pstScores[Board::middle][color] += Tables::pstScore(Board::middle, color, type, square);
     m_pstScores[Board::end][color] += Tables::pstScore(Board::end, color, type, square);
     m_phase -= Board::getPiecePhase(type);
+
+    if(type == Board::pawns || type == Board::king) {
+        m_pawnHash ^= Tables::ZTable.pieces[type+(color*PIECE_TYPES)][square];
+        return;
+    }
+
+    uint16_t kingInd = Board::serializeSingleBit(m_board.getPieceSet(Board::king, Board::getOppositeColor(color)));
+    m_tropism[color] += Board::getPieceTropism(type, Tables::lookupDistance(kingInd, square));
 }
 
 void GameState::makeMove(Move move) {
@@ -157,6 +180,9 @@ void GameState::makeMove(Move move) {
             m_pstScores[Board::end][turn] += Tables::pstScore(Board::end, turn, promoType, toInd);
 
             m_phase -= Board::getPiecePhase(promoType);
+            
+            uint16_t kingInd = Board::serializeSingleBit(m_board.getPieceSet(Board::king, Board::getOppositeColor(turn)));
+            m_tropism[turn] += Board::getPieceTropism(promoType, Board::getDistance(kingInd, toInd));
         }
     } else if(flag == KING_CASTLE) {
         setLastReversible();
@@ -191,6 +217,8 @@ void GameState::makeMove(Move move) {
 
     assert(m_zobrist == GameState::calculateZobrist(m_board));
     assert(m_pawnHash == GameState::calculatePawnHash(m_board));
+    assert(m_tropism[Board::white] == GameState::calculateTropism(m_board, Board::white)
+        && m_tropism[Board::black] == GameState::calculateTropism(m_board, Board::black));
 }
 
 void GameState::unmakeMove(Move move) {
@@ -282,6 +310,8 @@ void GameState::unmakeMove(Move move) {
 
     assert(m_zobrist == GameState::calculateZobrist(m_board));
     assert(m_pawnHash == GameState::calculatePawnHash(m_board));
+    assert(m_tropism[Board::white] == GameState::calculateTropism(m_board, Board::white)
+        && m_tropism[Board::black] == GameState::calculateTropism(m_board, Board::black));
 }
 
 void GameState::makeNullMove() {
@@ -345,6 +375,8 @@ void GameState::loadPosition(std::string fen) {
     m_zobrist = GameState::calculateZobrist(m_board);
     m_pawnHash = GameState::calculatePawnHash(m_board);
     m_phase = GameState::calculatePhase(m_board);
+    m_tropism[Board::white] = GameState::calculateTropism(m_board, Board::white);
+    m_tropism[Board::black] = GameState::calculateTropism(m_board, Board::black);
     m_lastReversible = 0;
     m_ply = 0;
     m_undoStack.clear();
@@ -401,6 +433,24 @@ int16_t GameState::calculatePstScore(Board& board, Board::Phase phase, Board::Pi
     }
 
     return pst;
+}
+
+int16_t GameState::calculateTropism(Board& board, Board::PieceColor turn) {
+    int16_t tropism = 0;
+    std::array<uint16_t, NUM_SQUARES> indBuf;
+    uint16_t kingSquare = Board::serializeSingleBit(board.getPieceSet(Board::king, Board::getOppositeColor(turn)));
+    
+    for(int type = Board::knights; type < Board::king; ++type) {
+        Board::PieceType pieceType = static_cast<Board::PieceType>(type);
+        size_t count = Board::serializeBitboard(board.getPieceSet(pieceType, turn), indBuf);
+        for(int i = 0; i < count; ++i) {
+            uint16_t square = indBuf[i];
+            int distance = Board::getDistance(square, kingSquare);
+            tropism += Board::getPieceTropism(pieceType, distance);
+        }
+    }
+
+    return tropism;
 }
 
 uint64_t GameState::calculatePawnHash(Board& board) {

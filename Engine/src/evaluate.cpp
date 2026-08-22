@@ -9,9 +9,6 @@ int16_t pawnShelterBonus(GameState* state, Board::PieceColor turn) {
     constexpr int16_t MAX_BONUS = 0;
     constexpr int16_t MISSING_PAWN_PENALTY = 10;
     constexpr int16_t OPEN_FILE_PENALTY = 12;
-    constexpr std::array<int16_t, 4> distancePenalties {
-        0, 5, 10, 18
-    };
 
     int16_t bonus = MAX_BONUS;
     Board* board = state->getBoard();
@@ -30,9 +27,6 @@ int16_t pawnShelterBonus(GameState* state, Board::PieceColor turn) {
 
         uint64_t shelterPawn = currFile & pawns;
         if(shelterPawn) {
-            // int distance = turn == Board::white ? Board::getRank(shelterPawn) - 1 : 6 - Board::getRank(shelterPawn);
-            // distance = std::min(distance, 3);
-            // bonus -= distancePenalties[distance];
             currFile = Board::shift<Board::east>(currFile);
             continue;
         }
@@ -59,7 +53,8 @@ int16_t kingSafetyScore(GameState* state) {
     int16_t shelterBonus = pawnShelterBonus(state, Board::white) - pawnShelterBonus(state, Board::black);
     Tables::PTable.insert(pawnHash, ply, 0, shelterBonus);
 
-    return shelterBonus;
+    int16_t tropismScore = state->getTropism(Board::white) - state->getTropism(Board::black);
+    return tropismScore + shelterBonus;
 }
 
 int16_t Eval::evaluate(GameState* state) {
@@ -69,7 +64,7 @@ int16_t Eval::evaluate(GameState* state) {
     int16_t pstScoreMid = state->getPst(Board::middle, Board::white) - state->getPst(Board::middle, Board::black);
     int16_t pstScoreEnd = state->getPst(Board::end, Board::white) - state->getPst(Board::end, Board::black);
  
-    int16_t evalMid = materialBalance + pstScoreMid;
+    int16_t evalMid = materialBalance + pstScoreMid + kingSafetyScore(state);
     int16_t evalEnd = materialBalance + pstScoreEnd;
     
     int16_t phase = state->getPhase();
