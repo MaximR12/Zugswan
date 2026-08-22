@@ -226,7 +226,7 @@ int16_t alphaBeta(GameState* state, SearchMetrics& metrics, FixedVector<Move, MA
                 Tables::insertKiller(move, state->getPly());
 
                 const int16_t bonus = 300 * depth - 250, malus = 200 * depth - 150;
-                Tables::updateHistory(state->getTurn(), move.getFrom(), move.getTo(), bonus); 
+                Tables::updateHistory(state->getTurn(), move.getFrom(), move.getTo(), bonus);
                 for(Move qMove : quietsSearched)
                     Tables::updateHistory(state->getTurn(), qMove.getFrom(), qMove.getTo(), -malus);
             }

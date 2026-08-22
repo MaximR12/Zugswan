@@ -312,6 +312,18 @@ uint64_t Tables::rookAttacks(uint16_t square, uint64_t occupied) {
     return magicTable[offset + occupied];
 }
 
+std::array<std::array<uint16_t, NUM_SQUARES>, NUM_SQUARES> distanceTable;
+
+void initDistance() {
+    for(int from = 0; from < NUM_SQUARES; ++from)
+        for(int to = 0; to < NUM_SQUARES; ++to)
+            distanceTable[from][to] = Board::getDistance(from, to);
+}
+
+int Tables::lookupDistance(uint16_t from, uint16_t to) {
+    return distanceTable[from][to];
+}
+
 void initZobristTable() {
     for(int color = Board::white; color <= Board::black; ++color)
         for(int type = Board::pawns; type <= Board::king; ++type)
@@ -331,8 +343,8 @@ const std::array<int16_t, NUM_SQUARES> pawnMiddlePST = {
     0,  0,  0,  0,  0,  0,  0,  0,
     50, 50, 50, 50, 50, 50, 50, 50,
     10, 10, 20, 30, 30, 20, 10, 10,
-    5,  5, 10, 25, 25, 10,  5,  5,
-    0,  0,  0, 20, 20,  0,  0,  0,
+    0,  5, 10, 25, 25, 10,  5,  5,
+   -5, -5,  0, 20, 20,  0,  0,  0,
     5, -5,-10,  0,  0,-10, -5,  5,
     5, 10, 10,-20,-20, 10, 10,  5,
     0,  0,  0,  0,  0,  0,  0,  0
@@ -472,6 +484,8 @@ void Tables::init() {
     initPawnAttackTables();
     initKnightMoveTable();
     initKingMoveTable();
+
+    initDistance();
 
     initMagicTable();
     initZobristTable();

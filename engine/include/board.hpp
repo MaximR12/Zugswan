@@ -218,12 +218,16 @@ public:
     static Directions getOppositeDirection(Directions dir);
     static PieceColor getOppositeColor(PieceColor color) { return static_cast<Board::PieceColor>(color ^ 1); }
     static bool isNegative(Directions dir);
+    static int16_t getPieceTropism(PieceType type, int distance);
     static int16_t getPiecePhase(int type);
     static int16_t getPieceValue(int type);
     static int16_t getPieceValue(PieceType type);
     static int16_t materialBalance(Board* board); //positive for white material advantage, negative for black material advantage
 
     static uint64_t getFileMask(uint64_t BB);
+    static int getFile(uint16_t square) { return square & 7; }
+    static int getRank(uint16_t square) { return square >> 4; }
+    static int getDistance(uint16_t from, uint16_t to) { return std::abs(getRank(from) - getRank(to)) + std::abs(getFile(from) - getFile(to)); }
     static int getFile(uint64_t BB);
     static int getRank(uint64_t BB);
     static uint16_t bitCount(uint64_t BB) { return std::popcount(BB); }

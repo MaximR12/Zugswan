@@ -40,7 +40,7 @@ public:
     static size_t getIndex(uint64_t zobrist) { return zobrist&INDEX_MASK; }
 };
 
-constexpr size_t PAWN_HASH_SIZE = 64 * 1024; //64 KB
+constexpr size_t PAWN_HASH_SIZE = 4 * 1024 * 1024; //4 MB
 
 struct PawnTableEntry {
     uint64_t pawnHash;
