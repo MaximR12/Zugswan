@@ -399,18 +399,14 @@ int16_t Board::getPieceValue(PieceType type) {
     return valueMap.at(type);
 }
 
-int16_t materialCount(Board* board, Board::PieceColor side) {
+int16_t Board::getMaterialCount(Board::PieceColor side) const {
     int16_t material = 0;
     for(int type = Board::pawns; type < Board::king; ++type) {
-        int16_t count = std::popcount(board->getPieceSet(static_cast<Board::PieceType>(type), side));
+        int16_t count = std::popcount(getPieceSet(static_cast<Board::PieceType>(type), side));
         material += count * Board::getPieceValue(type);
     }
 
     return material;
-}
-
-int16_t Board::materialBalance(Board* board) {
-    return materialCount(board, white) - materialCount(board, black);
 }
 
 bool Board::promotionPossible() const {

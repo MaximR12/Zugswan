@@ -149,6 +149,7 @@ int16_t alphaBeta(GameState* state, SearchMetrics& metrics, FixedVector<Move, MA
     FixedVector<Move, MAX_SEARCH_DEPTH> moveLine;
     Move move;
     
+    int16_t staticEval = VALUE_UNDEFINED;
     uint64_t zobrist = state->getZobrist();
     TransposeEntry* tEntry = Tables::TTable.probe(zobrist);
     if(tEntry) {
@@ -172,12 +173,23 @@ int16_t alphaBeta(GameState* state, SearchMetrics& metrics, FixedVector<Move, MA
             }
         }
 
+        staticEval = tEntry->eval;
         move = moveList.pop_move(tEntry->best); //search tt move first
     } else 
         move = moveList.pick_move();
     ++metrics.ttTotal;
 
-    constexpr int nullSearchReduction = 4;
+    constexpr int16_t FUTILITY_MARGIN = 150; //reverse futility pruning
+    bool canFutilityPrune = depth < 3 && !state->inCheck();
+    int16_t margin = FUTILITY_MARGIN*depth;
+    if(canFutilityPrune) {
+        if(staticEval == VALUE_UNDEFINED)
+            staticEval = Eval::evaluate(state);
+        if(staticEval >= margin + beta)
+            return beta;
+    }
+
+    constexpr int nullSearchReduction = 4; //null move pruning
     if(depth >= nullSearchReduction && state->shouldNullSearch()) {
         state->makeNullMove();
         int16_t score = -alphaBeta(state, metrics, moveLine, -beta, -(beta-1), depth-nullSearchReduction, ply+1);
@@ -197,11 +209,16 @@ int16_t alphaBeta(GameState* state, SearchMetrics& metrics, FixedVector<Move, MA
         if(!move.isCapture())
             quietsSearched.push_back(move);
 
+        if(canFutilityPrune && !move.isCapture() && !move.isPromotion() && staticEval + margin <= alpha) { //futility pruning
+            move = moveList.pick_move();
+            continue;
+        }
+
         state->makeMove(move);
 
         int16_t score;
         constexpr int fullDepthMoves = 4, reductionLimit = 3;
-        if(movesSearched < fullDepthMoves || depth < reductionLimit)
+        if(depth < reductionLimit || movesSearched < fullDepthMoves)
             score = -alphaBeta(state, metrics, moveLine, -beta, -alpha, depth-1, ply+1);
         else {
             score = -alphaBeta(state, metrics, moveLine, -beta, -alpha, depth-2, ply+1);
@@ -231,15 +248,15 @@ int16_t alphaBeta(GameState* state, SearchMetrics& metrics, FixedVector<Move, MA
                     Tables::updateHistory(state->getTurn(), qMove.getFrom(), qMove.getTo(), -malus);
             }
 
-            Tables::TTable.insert(zobrist, NodeType::lower, move, depth, score);
+            Tables::TTable.insert(zobrist, NodeType::lower, move, depth, score, staticEval);
             return bestScore;
         }
 
         move = moveList.pick_move(), ++movesSearched;
-    } 
+    }
 
     if(!stopRequested.load(std::memory_order_relaxed))
-        Tables::TTable.insert(zobrist, type, bestMove, depth, bestScore);
+        Tables::TTable.insert(zobrist, type, bestMove, depth, bestScore, staticEval);
 
     return alpha;
 }

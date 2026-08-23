@@ -9,9 +9,10 @@ enum class NodeType : uint8_t {
 };
 
 struct TransposeEntry {
-    uint64_t zobrist;
+    uint32_t key;
     Move best;
     int16_t score;
+    int16_t eval;
     uint8_t depth;
     NodeType type;
     bool used;
@@ -34,10 +35,11 @@ public:
     TranspositionTable() { clear(); }
 
     TransposeEntry* probe(uint64_t zobrist);
-    void insert(uint64_t zobrist, NodeType type, Move best, uint8_t depth, int16_t score);
+    void insert(uint64_t zobrist, NodeType type, Move best, uint8_t depth, int16_t score, int16_t eval);
     void clear();
 
     static size_t getIndex(uint64_t zobrist) { return zobrist&INDEX_MASK; }
+    static uint32_t getKey(uint64_t zobrist) { return zobrist>>32; }
 };
 
 constexpr size_t PAWN_HASH_SIZE = 4 * 1024 * 1024; //4 MB

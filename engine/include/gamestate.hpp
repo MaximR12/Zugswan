@@ -27,6 +27,7 @@ private:
     //eval info
     std::array<std::array<int16_t, 2>, NUM_PHASES> m_pstScores;
     std::array<int16_t, 2> m_tropism;
+    std::array<int16_t, 2> m_material;
     uint64_t m_pawnHash;
     int16_t m_phase;
 
@@ -69,6 +70,7 @@ public:
     uint64_t getPawnHash() { return m_pawnHash; }
     int16_t getPst(Board::Phase phase, Board::PieceColor color) { return m_pstScores[phase][color]; }
     int16_t getTropism(Board::PieceColor color) { return m_tropism[color]; }
+    int16_t getMaterial(Board::PieceColor color) { return m_material[color]; }
     int16_t getSEE(Move move) const { return m_board.staticExchangeEvaluation(move); }
     uint16_t getPly() const { return m_ply; }
     int16_t getPhase() const { return (m_phase * 256 + (totalPhase / 2)) / totalPhase; }
@@ -80,7 +82,7 @@ public:
     bool isRepetition() const;
     bool promotionPossible() const { return m_board.promotionPossible(); }
     bool shouldNullSearch() const { return !(m_inCheck || m_board.pawnEndgame()); };
-    bool shouldReduce(Move move) const;
+    bool shouldNotReduce(Move move) const;
 
     void updateLegalMoves() { m_legalMoves.clear(); MoveGen::getLegalMoves(m_board, m_legalMoves, m_ply); }
     void getLegalMoves(MoveList& moveList) { m_inCheck = MoveGen::getLegalMoves(m_board, moveList, m_ply); };

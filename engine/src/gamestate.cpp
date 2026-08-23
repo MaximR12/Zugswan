@@ -60,6 +60,7 @@ void GameState::removePiece(Board::PieceType type, Board::PieceColor color, uint
     m_zobrist ^= Tables::ZTable.pieces[type+(color*PIECE_TYPES)][square];
     m_pstScores[Board::middle][color] -= Tables::pstScore(Board::middle, color, type, square);
     m_pstScores[Board::end][color] -= Tables::pstScore(Board::end, color, type, square);
+    m_material[color] -= Board::getPieceValue(type);
     m_phase += Board::getPiecePhase(type);
 
     if(type == Board::pawns || type == Board::king) {
@@ -78,6 +79,7 @@ void GameState::addPiece(Board::PieceType type, Board::PieceColor color, uint64_
     m_zobrist ^= Tables::ZTable.pieces[type+(color*PIECE_TYPES)][square];
     m_pstScores[Board::middle][color] += Tables::pstScore(Board::middle, color, type, square);
     m_pstScores[Board::end][color] += Tables::pstScore(Board::end, color, type, square);
+    m_material[color] += Board::getPieceValue(type);
     m_phase -= Board::getPiecePhase(type);
 
     if(type == Board::pawns || type == Board::king) {
@@ -179,6 +181,8 @@ void GameState::makeMove(Move move) {
             m_pstScores[Board::end][turn] -= Tables::pstScore(Board::end, turn, Board::pawns, toInd);
             m_pstScores[Board::end][turn] += Tables::pstScore(Board::end, turn, promoType, toInd);
 
+            m_material[turn] -= Board::getPieceValue(Board::pawns);
+            m_material[turn] += Board::getPieceValue(promoType);
             m_phase -= Board::getPiecePhase(promoType);
             
             uint16_t kingInd = Board::serializeSingleBit(m_board.getPieceSet(Board::king, Board::getOppositeColor(turn)));
@@ -219,6 +223,8 @@ void GameState::makeMove(Move move) {
     assert(m_pawnHash == GameState::calculatePawnHash(m_board));
     assert(m_tropism[Board::white] == GameState::calculateTropism(m_board, Board::white)
         && m_tropism[Board::black] == GameState::calculateTropism(m_board, Board::black));
+    assert(m_material[Board::white] == m_board.getMaterialCount(Board::white)
+        && m_material[Board::black] == m_board.getMaterialCount(Board::black));
 }
 
 void GameState::unmakeMove(Move move) {
@@ -312,6 +318,8 @@ void GameState::unmakeMove(Move move) {
     assert(m_pawnHash == GameState::calculatePawnHash(m_board));
     assert(m_tropism[Board::white] == GameState::calculateTropism(m_board, Board::white)
         && m_tropism[Board::black] == GameState::calculateTropism(m_board, Board::black));
+    assert(m_material[Board::white] == m_board.getMaterialCount(Board::white)
+        && m_material[Board::black] == m_board.getMaterialCount(Board::black));
 }
 
 void GameState::makeNullMove() {
@@ -358,9 +366,8 @@ bool GameState::isRepetition() const {
     return false;
 }
 
-bool GameState::shouldReduce(Move move) const {
-    return !(m_inCheck || (m_board.getPieceType(move.getFrom(), m_board.getTurn()) == Board::pawns) 
-        || Tables::isKiller(move, m_ply) || move.isGoodCapture() || move.isPromotion());
+bool GameState::shouldNotReduce(Move move) const {
+    return Tables::isKiller(move, m_ply) || move.isGoodCapture() || move.isPromotion();
 }
 
 void GameState::setPst() {
@@ -377,6 +384,8 @@ void GameState::loadPosition(std::string fen) {
     m_phase = GameState::calculatePhase(m_board);
     m_tropism[Board::white] = GameState::calculateTropism(m_board, Board::white);
     m_tropism[Board::black] = GameState::calculateTropism(m_board, Board::black);
+    m_material[Board::white] = m_board.getMaterialCount(Board::white);
+    m_material[Board::black] = m_board.getMaterialCount(Board::black);
     m_lastReversible = 0;
     m_ply = 0;
     m_undoStack.clear();

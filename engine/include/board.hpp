@@ -55,6 +55,7 @@ constexpr uint64_t BLACK_QUEENS = 0x0800000000000000ULL;
 constexpr uint64_t WHITE_KING = 0x0000000000000010ULL; 
 constexpr uint64_t BLACK_KING = 0x1000000000000000ULL;
 
+constexpr int16_t VALUE_UNDEFINED = 30'002;
 constexpr int16_t VALUE_INFINITE = 30'001;
 
 constexpr int16_t northOffset = 8;
@@ -139,9 +140,11 @@ public:
     bool getKingCastleRights(PieceColor color) const { return m_kingCastleRights[color]; }
     bool getQueenCastleRights(PieceColor color) const { return m_queenCastleRights[color]; }
     uint16_t getHalfMoveClock() const { return m_halfMoveClock; }
+
     PieceColor getPieceColor(uint16_t ind) const { assert(ind >= 0 && ind < NUM_SQUARES); return m_pieceBB[white][all]&(1ULL<<ind) ? white : black; }
     PieceType getPieceType(uint16_t ind, PieceColor color) const;
     uint16_t getPieceCount(PieceType type, PieceColor color) const;
+    int16_t getMaterialCount(Board::PieceColor turn) const;
     
     uint64_t attacksTo(uint16_t square, PieceColor color) const;
     uint64_t attackTargets(uint16_t square, PieceType type, PieceColor color) const;
@@ -222,7 +225,6 @@ public:
     static int16_t getPiecePhase(int type);
     static int16_t getPieceValue(int type);
     static int16_t getPieceValue(PieceType type);
-    static int16_t materialBalance(Board* board); //positive for white material advantage, negative for black material advantage
 
     static uint64_t getFileMask(uint64_t BB);
     static int getFile(uint16_t square) { return square & 7; }

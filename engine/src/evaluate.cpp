@@ -59,7 +59,7 @@ int16_t kingSafetyScore(GameState* state) {
 
 int16_t Eval::evaluate(GameState* state) {
     int16_t sideMultiple = getSideMultiple(state->getTurn());
-    int16_t materialBalance = Board::materialBalance(state->getBoard());
+    int16_t materialBalance = state->getMaterial(Board::white) - state->getMaterial(Board::black);
 
     int16_t pstScoreMid = state->getPst(Board::middle, Board::white) - state->getPst(Board::middle, Board::black);
     int16_t pstScoreEnd = state->getPst(Board::end, Board::white) - state->getPst(Board::end, Board::black);
