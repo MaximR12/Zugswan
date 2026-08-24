@@ -219,7 +219,7 @@ public:
     static int16_t getDirectionOffset(int dir);
     static Directions getOppositeDirection(int dir);
     static Directions getOppositeDirection(Directions dir);
-    static PieceColor getOppositeColor(PieceColor color) { return static_cast<Board::PieceColor>(color ^ 1); }
+    static constexpr PieceColor getOppositeColor(PieceColor color) { return static_cast<Board::PieceColor>(color ^ 1); }
     static bool isNegative(Directions dir);
     static int16_t getPieceTropism(PieceType type, int distance);
     static int16_t getPiecePhase(int type);

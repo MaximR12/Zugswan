@@ -58,6 +58,7 @@ int16_t kingSafetyScore(GameState* state) {
 }
 
 int16_t Eval::evaluate(GameState* state) {
+    constexpr int16_t TEMPO_BONUS = 10;
     int16_t sideMultiple = getSideMultiple(state->getTurn());
     int16_t materialBalance = state->getMaterial(Board::white) - state->getMaterial(Board::black);
 
@@ -70,5 +71,5 @@ int16_t Eval::evaluate(GameState* state) {
     int16_t phase = state->getPhase();
     int16_t eval = ((evalMid * (256 - phase)) + (evalEnd * phase)) / 256;
     
-    return eval * sideMultiple;
+    return eval * sideMultiple + TEMPO_BONUS;
 }

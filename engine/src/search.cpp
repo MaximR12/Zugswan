@@ -34,8 +34,7 @@ int16_t quiescenceSearch(GameState* state, SearchMetrics& metrics, int16_t alpha
     
     ++metrics.nodes;
 
-    constexpr int16_t TEMPO_BONUS = 10;
-    int16_t staticEval = Eval::evaluate(state) + TEMPO_BONUS;
+    int16_t staticEval = Eval::evaluate(state);
     int16_t bestScore = staticEval;
     
     if(bestScore >= beta)
@@ -51,14 +50,16 @@ int16_t quiescenceSearch(GameState* state, SearchMetrics& metrics, int16_t alpha
     if(bestScore > alpha)
         alpha = bestScore;
 
-    MoveList moveList;
-    state->getLegalMoves(moveList);
-
-    if(moveList.size() == 0) //check mate / stalemate
-        return state->inCheck() ? -VALUE_MATE : VALUE_DRAW;
-
     if(state->getHalfMoveClock() >= 100 || state->isRepetition()) //check 50 move rule / three move repitition
         return VALUE_DRAW;
+
+    MoveList moveList;
+    if(state->inCheck()) {
+        state->getLegalMoves<GenType::all>(moveList);
+        if(moveList.size() == 0)
+            return -VALUE_MATE;
+    } else
+        state->getLegalMoves<GenType::capture>(moveList);
 
     FixedVector<Move, MAX_SEARCH_DEPTH> moveLine;
     Move move;
@@ -86,24 +87,23 @@ int16_t quiescenceSearch(GameState* state, SearchMetrics& metrics, int16_t alpha
     ++metrics.ttTotal;
     
     while((move = moveList.pick_move()) != Move::invalid()) {
-        if(!move.isCapture())
-            continue;
+        if(move.isCapture()) {
+            //delta pruning, skip moves unlikely to raise alpha
+            constexpr int16_t delta = 200;
+            int16_t captureValue = move.getFlag() != EP_CAPTURE 
+                ? Board::getPieceValue(state->getBoard()->getPieceType(move.getTo(), Board::getOppositeColor(state->getTurn()))) : Board::getPieceValue(Board::pawns);
+            int16_t futilityValue = delta + captureValue; 
+            
+            if(captureValue <= alpha - delta) {
+                bestScore = std::max(bestScore, futilityValue);
+                continue;
+            }
 
-        //delta pruning, skip moves unlikely to raise alpha
-        constexpr int16_t delta = 200;
-        int16_t captureValue = move.getFlag() != EP_CAPTURE 
-            ? Board::getPieceValue(state->getBoard()->getPieceType(move.getTo(), Board::getOppositeColor(state->getTurn()))) : Board::getPieceValue(Board::pawns);
-        int16_t futilityValue = delta + captureValue; 
-        
-        if(captureValue <= alpha - delta) {
-            bestScore = std::max(bestScore, futilityValue);
-            continue;
-        }
-
-        int16_t staticExchangeEval = state->getSEE(move);
-        if(staticExchangeEval <= alpha - delta) {
-            bestScore = std::max(bestScore, staticExchangeEval);
-            continue;
+            int16_t staticExchangeEval = state->getSEE(move);
+            if(staticExchangeEval <= alpha - delta) {
+                bestScore = std::max(bestScore, staticExchangeEval);
+                continue;
+            }
         }
 
         state->makeMove(move);
@@ -132,18 +132,18 @@ int16_t alphaBeta(GameState* state, SearchMetrics& metrics, FixedVector<Move, MA
 
     ++metrics.nodes;
 
-    MoveList moveList;
-    state->getLegalMoves(moveList);
-
-    if(moveList.size() == 0) { //check mate / stalemate
-        prevMoveLine.clear();
-        return state->inCheck() ? (-VALUE_MATE + ply) : VALUE_DRAW;
-    }
-
     if(ply != 0 && (state->getHalfMoveClock() >= 100 || state->isRepetition())) { //check 50 move rule / three move repitition
         if(VALUE_DRAW < beta)
             prevMoveLine.clear();
         return VALUE_DRAW;
+    }
+
+    MoveList moveList;
+    state->getLegalMoves<GenType::all>(moveList);
+
+    if(moveList.size() == 0) { //checkmate / stalemate
+        prevMoveLine.clear();
+        return state->inCheck() ? (-VALUE_MATE + ply) : VALUE_DRAW;
     }
 
     FixedVector<Move, MAX_SEARCH_DEPTH> moveLine;
@@ -316,7 +316,7 @@ void iterativeDeepening(GameState* state, FixedVector<Move, MAX_SEARCH_DEPTH>& m
 
     if(moveLine.size() == 0) { //push default move
         MoveList moveList;
-        state->getLegalMoves(moveList);
+        state->getLegalMoves<GenType::all>(moveList);
         moveLine.push_back(moveList[0]);
     }
 }

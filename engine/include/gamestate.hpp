@@ -12,6 +12,7 @@ struct StateInfo {
     Board::PieceType captureType;
     uint16_t halfMoveClock;
     uint16_t lastReversible;
+    bool inCheck;
     bool kingCastleRights;
     bool queenCastleRights;
 };
@@ -84,8 +85,9 @@ public:
     bool shouldNullSearch() const { return !(m_inCheck || m_board.pawnEndgame()); };
     bool shouldNotReduce(Move move) const;
 
-    void updateLegalMoves() { m_legalMoves.clear(); MoveGen::getLegalMoves(m_board, m_legalMoves, m_ply); }
-    void getLegalMoves(MoveList& moveList) { m_inCheck = MoveGen::getLegalMoves(m_board, moveList, m_ply); };
+    void updateLegalMoves() { m_legalMoves.clear(); MoveGen::getLegalMoves<GenType::all>(m_board, m_legalMoves, m_ply); }
+    template<GenType genType>
+    void getLegalMoves(MoveList& moveList) { m_inCheck = MoveGen::getLegalMoves<genType>(m_board, moveList, m_ply); };
     void setPst();
 
     void updateTime(int wTime, int bTime, int wInc=0, int bInc=0) { m_whiteTime = wTime; m_whiteInc = wInc; m_blackTime = bTime; m_blackInc = bInc; }

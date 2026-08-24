@@ -4,7 +4,7 @@
 
 uint64_t perft(GameState* game, int depth) {
     MoveList moveList;
-    game->getLegalMoves(moveList);
+    game->getLegalMoves<GenType::all>(moveList);
     uint64_t nodes = 0;
 
     if(depth == 1) 
@@ -23,7 +23,7 @@ template<Perft::Mode mode>
 void Perft::run(GameState* game, int depth) {
     if constexpr (mode == divide) {
         MoveList moveList;
-        game->getLegalMoves(moveList);
+        game->getLegalMoves<GenType::all>(moveList);
         uint64_t total = 0;
 
         for(size_t i = 0; i < moveList.size(); ++i) {

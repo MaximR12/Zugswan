@@ -1,7 +1,6 @@
 #include "uci.hpp"
 
 int main() {
-    Board::printBitBoard(INDEX_MASK);
     Tables::init();
 
     GameState game{};

@@ -100,6 +100,7 @@ void GameState::makeMove(Move move) {
         .captureType=Board::invalid,
         .halfMoveClock=m_board.getHalfMoveClock(),
         .lastReversible=m_lastReversible,
+        .inCheck = m_inCheck,
         .kingCastleRights=m_board.getKingCastleRights(turn),
         .queenCastleRights=m_board.getQueenCastleRights(turn),
     });
@@ -208,6 +209,9 @@ void GameState::makeMove(Move move) {
         updateOccupied(m_board, m_board.getOccupied() ^ rookFromToBB); 
     }
 
+    if(m_board.attackTargets(toInd, fromType, turn) & m_board.getPieceSet(Board::king, oppColor))
+        m_inCheck = true;
+
     uint64_t epTarget = m_board.getEnPassantTarget(turn);
     if(epTarget){
         m_board.updateEnPassantTargets(turn, 0ULL);
@@ -300,6 +304,7 @@ void GameState::unmakeMove(Move move) {
     m_board.updateEnPassantTargets(fromColor, stateInfo.epTarget);
     m_board.updateEnPassantTargets(oppColor, stateInfo.oppEpTarget);
     
+    m_inCheck = stateInfo.inCheck;
     uint8_t prevCastle = m_board.getCastleRights();
     m_board.updateKingCastleRights(fromColor, stateInfo.kingCastleRights);
     m_board.updateQueenCastleRights(fromColor, stateInfo.queenCastleRights);
