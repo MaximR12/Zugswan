@@ -18,6 +18,8 @@ struct SearchMetrics {
     int nodes = 0;
     int ttHits = 0;
     int ttTotal = 0;
+    double ptHits = 0.0;
+    double ptTotal = 0.0;
 };
 
 namespace Search {

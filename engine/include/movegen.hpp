@@ -11,7 +11,6 @@ enum class GenType {
 };
 
 namespace MoveGen {
-
     //return true if in check
     template<GenType genType>
     bool getLegalMoves(Board& board, MoveList& moveList, uint16_t ply);

@@ -45,9 +45,10 @@ public:
 constexpr size_t PAWN_HASH_SIZE = 4 * 1024 * 1024; //4 MB
 
 struct PawnTableEntry {
-    uint64_t pawnHash;
+    uint32_t key;
     uint16_t ply;
-    int16_t pawnScore;
+    int16_t mgPawnScore;
+    int16_t egPawnScore;
     int16_t kingSafetyBonus;
     bool used;
 };
@@ -69,8 +70,9 @@ public:
     PawnTable() { clear(); }
 
     PawnTableEntry* probe(uint64_t hash, uint16_t ply);
-    void insert(uint64_t hash, uint16_t ply, int16_t score, int16_t kingBonus);
+    void insert(uint64_t hash, uint16_t ply, int16_t mgScore, int16_t egScore, int16_t kingBonus);
     void clear();
 
     static size_t getIndex(uint64_t hash) { return hash&PAWN_INDEX_MASK; }
+    static uint32_t getKey(uint64_t hash) { return hash>>32; }
 };

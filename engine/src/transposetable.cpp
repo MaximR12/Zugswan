@@ -74,15 +74,20 @@ void TranspositionTable::insert(uint64_t zobrist, NodeType type, Move best, uint
 void PawnTable::clear() {
     for(int i = 0; i < PT_SIZE; ++i) {
         PawnCluster& cluster = m_table[i];
-        for(int j = 0; j < PAWN_CLUSTER_SIZE; ++j)
+        for(int j = 0; j < PAWN_CLUSTER_SIZE; ++j) {
+            cluster.entries[j].mgPawnScore = VALUE_UNDEFINED;
+            cluster.entries[j].egPawnScore = VALUE_UNDEFINED;
+            cluster.entries[j].kingSafetyBonus = VALUE_UNDEFINED;
             cluster.entries[j].used = false;
+        }
     }
 }
 
 PawnTableEntry* PawnTable::probe(uint64_t hash, uint16_t ply) {
     size_t index = PawnTable::getIndex(hash);
-    assert(index < TT_SIZE);
+    assert(index < PT_SIZE);
 
+    uint32_t key = PawnTable::getKey(hash);
     PawnCluster& cluster = m_table[index];
     for(int i = 0; i < PAWN_CLUSTER_SIZE; ++i) {
         PawnTableEntry& currEntry = cluster.entries[i];
@@ -90,7 +95,7 @@ PawnTableEntry* PawnTable::probe(uint64_t hash, uint16_t ply) {
         if(!currEntry.used)
             return nullptr;
 
-        if(currEntry.pawnHash == hash) {
+        if(currEntry.key == key) {
             currEntry.ply = std::max(ply, currEntry.ply);
             return &currEntry; 
         }
@@ -99,19 +104,22 @@ PawnTableEntry* PawnTable::probe(uint64_t hash, uint16_t ply) {
     return nullptr;
 }
 
-void PawnTable::insert(uint64_t hash, uint16_t ply, int16_t score, int16_t kingBonus) {
+void PawnTable::insert(uint64_t hash, uint16_t ply, int16_t mgScore, int16_t egScore, int16_t kingBonus) {
     size_t index = getIndex(hash);
     PawnCluster& cluster = m_table[index];
 
+    uint32_t key = PawnTable::getKey(hash);
     uint16_t greatestAge = -VALUE_INFINITE;
     PawnTableEntry& replace = cluster.entries[0];
     for(int i = 0; i < PAWN_CLUSTER_SIZE; ++i) {
         if(!cluster.entries[i].used) {
             cluster.entries[i] = {
-                .pawnHash = hash,
+                .key = key,
                 .ply = ply,
-                .pawnScore = score,
-                .kingSafetyBonus = kingBonus
+                .mgPawnScore = mgScore,
+                .egPawnScore = egScore,
+                .kingSafetyBonus = kingBonus,
+                .used = true
             };
 
             return;
@@ -125,9 +133,11 @@ void PawnTable::insert(uint64_t hash, uint16_t ply, int16_t score, int16_t kingB
     }
 
     replace = {
-        .pawnHash = hash,
+        .key = key,
         .ply = ply,
-        .pawnScore = score,
-        .kingSafetyBonus = kingBonus
+        .mgPawnScore = mgScore,
+        .egPawnScore = egScore,
+        .kingSafetyBonus = kingBonus,
+        .used = true
     };
 }

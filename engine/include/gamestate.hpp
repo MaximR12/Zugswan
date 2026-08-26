@@ -102,6 +102,5 @@ public:
     static int16_t calculatePstScore(Board& board, Board::Phase phase, Board::PieceColor turn);
     static int16_t calculateTropism(Board& board, Board::PieceColor turn);
     static int16_t calculatePhase(Board& board);
-    static int16_t evaluatePawnStructure(Board& board);
     static int getMoveTime(int base, int increment) { return base / 20 + increment / 2; }
 };
