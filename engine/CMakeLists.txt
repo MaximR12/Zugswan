@@ -15,10 +15,6 @@ target_sources(Engine PRIVATE
   src/perft.cpp
 )
 
-target_include_directories(Engine PUBLIC
-  ${CMAKE_CURRENT_SOURCE_DIR}/include
-)
-
 add_executable(Zugswan src/main.cpp)
 
 target_link_libraries(Zugswan PRIVATE Engine)
