@@ -262,7 +262,7 @@ int16_t alphaBeta(GameState* state, SearchMetrics& metrics, FixedVector<Move, MA
 }
 
 template<SearchType type>
-void iterativeDeepening(GameState* state, FixedVector<Move, MAX_SEARCH_DEPTH>& moveLine, SearchMetrics& metrics, int depth=MAX_SEARCH_DEPTH, int movetime=0) {
+void iterativeDeepening(GameState* state, FixedVector<Move, MAX_SEARCH_DEPTH>& moveLine, SearchMetrics& metrics, int depth=MAX_SEARCH_DEPTH, int movetime=0) {    
     stopRequested = false;
 
     if constexpr (type == SearchType::time) {

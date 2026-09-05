@@ -1,5 +1,5 @@
 #include "evaluate.hpp"
-#include "search.hpp"
+#include "tables.hpp"
 
 struct Score {
     int16_t mgScore;
@@ -8,10 +8,123 @@ struct Score {
     Score operator-(const Score& other) {
         return Score(this->mgScore - other.mgScore, this->egScore - other.egScore);
     }
+    
+    void operator+=(const Score& other) {
+        this->mgScore += other.mgScore;
+        this->egScore += other.egScore;
+    }
 };
 
 int16_t getSideMultiple(Board::PieceColor turn) { //return -1 for black and 1 for white
     return -turn + Board::getOppositeColor(turn);
+}
+
+Score evalKnight(Board* board, uint16_t square, Board::PieceColor turn) {
+    constexpr Score MOBILITY_BONUS = {4, 4};
+    constexpr Score PAWN_DEFENDED_BONUS = {5, 5};
+    constexpr Score MISSING_PAWN_PENALTY = {2, 3};
+    
+    Score score = {Board::getPieceValue(Board::knights), Board::getPieceValue(Board::knights)};
+    
+    constexpr uint16_t STARTING_PAWNS = 16;
+    uint64_t allPawns = board->getPieceSet(Board::pawns, Board::white) | board->getPieceSet(Board::pawns, Board::black);
+    uint16_t pawnCount = Board::bitCount(allPawns);
+    score.mgScore -= (STARTING_PAWNS - pawnCount) * MISSING_PAWN_PENALTY.mgScore;
+    score.egScore -= (STARTING_PAWNS - pawnCount) * MISSING_PAWN_PENALTY.egScore;
+
+    uint64_t pawnSet = board->getPieceSet(Board::pawns, turn);
+    uint64_t oppPawnSet = board->getPieceSet(Board::pawns, Board::getOppositeColor(turn));
+    uint64_t oppPawnControl = turn == Board::white ? board->blackPawnTargets(oppPawnSet) : board->whitePawnTargets(oppPawnSet); 
+    
+    constexpr uint16_t AVERAGE_MOBILITY = 4;
+    uint64_t moveSet = Tables::knightMoves(square);
+    moveSet &= ~(pawnSet | oppPawnControl);
+    uint16_t mobility = Board::bitCount(moveSet);
+    score.mgScore += (mobility - AVERAGE_MOBILITY) * MOBILITY_BONUS.mgScore;
+    score.egScore += (mobility - AVERAGE_MOBILITY) * MOBILITY_BONUS.egScore;
+
+    uint64_t possibleDefenders = Tables::pawnAttacks(Board::getOppositeColor(turn), square);
+    bool pawnDefended = possibleDefenders & pawnSet;
+    score.mgScore += pawnDefended * PAWN_DEFENDED_BONUS.mgScore;
+    score.egScore += pawnDefended * PAWN_DEFENDED_BONUS.egScore;
+
+    return score;
+}
+
+Score evalBishop(Board* board, uint16_t square, Board::PieceColor turn) {
+    constexpr Score MOBILITY_BONUS = {4, 5};
+    
+    Score score = {Board::getPieceValue(Board::bishops), Board::getPieceValue(Board::bishops)};
+
+    uint64_t pawnSet = board->getPieceSet(Board::pawns, turn);
+    uint64_t oppPawnSet = board->getPieceSet(Board::pawns, Board::getOppositeColor(turn));
+    uint64_t oppPawnControl = turn == Board::white ? board->blackPawnTargets(oppPawnSet) : board->whitePawnTargets(oppPawnSet); 
+    
+    constexpr uint16_t AVERAGE_MOBILITY = 7;
+    uint64_t moveSet = Tables::bishopAttacks(square, pawnSet);
+    moveSet &= ~(pawnSet | oppPawnControl);
+    uint16_t mobility = Board::bitCount(moveSet);
+    score.mgScore += (mobility - AVERAGE_MOBILITY) * MOBILITY_BONUS.mgScore;
+    score.egScore += (mobility - AVERAGE_MOBILITY) * MOBILITY_BONUS.egScore;
+
+    return score;
+}
+
+Score evalRook(Board* board, uint16_t square, Board::PieceColor turn) {
+    constexpr Score MOBILITY_BONUS = {2, 4};
+    
+    Score score = {Board::getPieceValue(Board::rooks), Board::getPieceValue(Board::rooks)};
+
+    uint64_t pawnSet = board->getPieceSet(Board::pawns, turn);
+    uint64_t oppPawnSet = board->getPieceSet(Board::pawns, Board::getOppositeColor(turn));
+    uint64_t oppPawnControl = turn == Board::white ? board->blackPawnTargets(oppPawnSet) : board->whitePawnTargets(oppPawnSet); 
+    
+    constexpr uint16_t AVERAGE_MOBILITY = 7;
+    uint64_t moveSet = Tables::rookAttacks(square, pawnSet);
+    moveSet &= ~(pawnSet | oppPawnControl);
+    uint16_t mobility = Board::bitCount(moveSet);
+    score.mgScore += (mobility - AVERAGE_MOBILITY) * MOBILITY_BONUS.mgScore;
+    score.egScore += (mobility - AVERAGE_MOBILITY) * MOBILITY_BONUS.egScore;
+
+    return score;
+}
+
+Score evalQueen() {
+    return {Board::getPieceValue(Board::queens), Board::getPieceValue(Board::queens)};
+}
+
+Score evalPiece(Board* board, uint16_t square, Board::PieceType type, Board::PieceColor turn) {
+    switch(type) {
+        case(Board::knights):
+            return evalKnight(board, square, turn);
+        case(Board::bishops):
+            return evalBishop(board, square, turn);
+        case(Board::rooks):
+            return evalRook(board, square, turn);
+        case(Board::queens):
+            return evalQueen();
+        default:
+            return {0, 0};
+    }
+} 
+
+Score evalPieces(Board* board, Board::PieceColor turn) {
+    Score score = {0, 0};
+    
+    std::array<uint16_t, NUM_SQUARES> indBuf;
+    for(int type = Board::knights; type < Board::king; ++type) {
+        Board::PieceType pieceType = static_cast<Board::PieceType>(type);
+        Score pieceScore = {0, 0};
+
+        uint64_t pieceSet = board->getPieceSet(pieceType, turn);
+        size_t count = Board::serializeBitboard(pieceSet, indBuf);
+        for(int i = 0; i < count; ++i)
+            pieceScore += evalPiece(board, indBuf[i], pieceType, turn);
+    
+        score += pieceScore;
+    }
+
+    return score;
 }
 
 bool isBackward(uint64_t pawnBB, uint64_t pawnSet, uint64_t oppPawnControl, Board::PieceColor turn, Board::Directions pawnDir) {
@@ -171,7 +284,7 @@ int16_t kingSafetyScore(GameState* state) {
     uint64_t pawnHash = state->getPawnHash();
     uint16_t ply = state->getPly();
     
-    int16_t shelterBonus = pawnShelterBonus(state, Board::white) - pawnShelterBonus(state, Board::black);
+    int16_t shelterBonus;
     PawnTableEntry* pEntry = Tables::PTable.probe(pawnHash, ply);
     if(pEntry && pEntry->kingSafetyBonus != VALUE_UNDEFINED)
         shelterBonus = pEntry->kingSafetyBonus;
@@ -190,15 +303,19 @@ int16_t kingSafetyScore(GameState* state) {
 int16_t Eval::evaluate(GameState* state) {
     constexpr int16_t TEMPO_BONUS = 10;
     int16_t sideMultiple = getSideMultiple(state->getTurn());
-    int16_t materialBalance = state->getMaterial(Board::white) - state->getMaterial(Board::black);
+    // int16_t materialBalance = state->getMaterial(Board::white) - state->getMaterial(Board::black);
 
     int16_t pstScoreMid = state->getPst(Board::middle, Board::white) - state->getPst(Board::middle, Board::black);
     int16_t pstScoreEnd = state->getPst(Board::end, Board::white) - state->getPst(Board::end, Board::black);
 
     Score pawnScore = getPawnScore(state);
+    Score piecesScore = evalPieces(state->getBoard(), Board::white) - evalPieces(state->getBoard(), Board::black);
+    
+    int16_t pawnDiff = Board::bitCount(state->getBoard()->getPieceSet(Board::pawns, Board::white)) - Board::bitCount(state->getBoard()->getPieceSet(Board::pawns, Board::black));
+    int16_t pawnMaterial = pawnDiff * Board::getPieceValue(Board::pawns); 
  
-    int16_t evalMid = materialBalance + pstScoreMid + kingSafetyScore(state) + pawnScore.mgScore;
-    int16_t evalEnd = materialBalance + pstScoreEnd + pawnScore.egScore;
+    int16_t evalMid = piecesScore.mgScore + pawnMaterial + pstScoreMid + pawnScore.mgScore + kingSafetyScore(state);
+    int16_t evalEnd = piecesScore.egScore + pawnMaterial + pstScoreEnd + pawnScore.egScore;
     
     int16_t phase = state->getPhase();
     int16_t eval = ((evalMid * (256 - phase)) + (evalEnd * phase)) / 256;

@@ -1,6 +1,7 @@
 #include <array>
 #include <unordered_map>
 #include "movegen.hpp"
+#include "evaluate.hpp"
 
 enum class MoveType {
    pawn, promotion, knight, bishop, rook, queen, king
@@ -104,12 +105,12 @@ void serializeMoves(Board& board, MoveList& moveList, uint64_t targets, int16_t 
       if constexpr (type != MoveType::promotion) {
          Move move = Move(flag, from, to);
          moveList.push_back(move);
-         moveList.back().m_score = scoreMove<color, type>(board, move, ply);
+         moveList.back().score = scoreMove<color, type>(board, move, ply);
       } else {
          for(uint16_t promoType = KNIGHT_PROMOTION; promoType <= QUEEN_PROMOTION; ++promoType) {
             Move move = Move(flag | promoType, from, to);
             moveList.push_back(move);
-            moveList.back().m_score = scoreMove<color, type>(board, move, ply);
+            moveList.back().score = scoreMove<color, type>(board, move, ply);
          }
       }
    }

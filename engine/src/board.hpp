@@ -154,7 +154,7 @@ public:
     bool pawnEndgame() const;
 
     int16_t staticExchangeEvaluation(Move move) const;
-    int16_t staticCaptureEvaluation(PieceType attacker, PieceColor oppColor, uint16_t to) const { return getPieceValue(getPieceType(to, oppColor)) - getPieceValue(attacker); }
+    int16_t staticCaptureEvaluation(PieceType attacker, PieceColor oppColor, uint16_t to) const;
 
     void switchTurn() { m_turn = Board::getOppositeColor(m_turn); }
     void updateBB(PieceType type, PieceColor color, uint64_t BB) { m_pieceBB[color][type] = BB; }

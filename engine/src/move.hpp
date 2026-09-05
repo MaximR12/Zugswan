@@ -41,7 +41,7 @@ private:
     uint16_t m_move;
 
 public:
-    int16_t m_score;
+    int16_t score;
 
     Move() = default;
     Move(uint16_t move) : m_move{move} { }
@@ -57,7 +57,7 @@ public:
 
     bool isCapture() const { return getFlag()&CAPTURE; }
     bool isPromotion() const { return getFlag()&0x8; }
-    bool isGoodCapture() const { return m_score >= GOOD_CAPTURE_BASE; }
+    bool isGoodCapture() const { return score >= GOOD_CAPTURE_BASE; }
 
     static bool isCapture(uint16_t flag) { return flag&CAPTURE; }
     static bool isPromotion(uint16_t flag) { return flag&0x8; }
@@ -111,9 +111,9 @@ inline Move MoveList::pick_move() {
         return Move::invalid();
 
     size_t bestInd = 0;
-    int16_t maxScore = m_data[0].m_score;
+    int16_t maxScore = m_data[0].score;
     for(size_t i = 1; i < m_size; ++i) {
-        int16_t currScore = m_data[i].m_score;
+        int16_t currScore = m_data[i].score;
         if(currScore > maxScore)
             maxScore = currScore, bestInd = i;
     }

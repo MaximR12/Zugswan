@@ -1,5 +1,7 @@
-#include "stdint.h"
+#pragma once
+
 #include "gamestate.hpp"
+#include "stdint.h"
 
 namespace Eval {
 

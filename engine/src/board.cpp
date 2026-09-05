@@ -164,6 +164,10 @@ int16_t seeHelper(const Board& board, uint16_t to, Board::PieceType target, uint
     return gain[0];
 }
 
+int16_t Board::staticCaptureEvaluation(PieceType attacker, PieceColor oppColor, uint16_t to) const {
+    return getPieceValue(getPieceType(to, oppColor)) - getPieceValue(attacker);
+}
+
 int16_t Board::staticExchangeEvaluation(Move move) const {
     assert(move.isCapture());
 
@@ -176,6 +180,18 @@ int16_t Board::staticExchangeEvaluation(Move move) const {
     Board::PieceType attacker = getPieceType(from, attackColor);
 
     return seeHelper(*(this), to, target, from, attacker, attackColor);
+}
+
+constexpr std::array<int16_t, 6> valueMap {
+    100, 320, 330, 500, 900, VALUE_INFINITE
+};
+
+int16_t Board::getPieceValue(int type) {
+    return valueMap.at(type);
+}
+
+int16_t Board::getPieceValue(PieceType type) {
+    return valueMap.at(type);
 }
 
 constinit const std::array<Board::PieceType, 4> promoTypeTable {
@@ -387,23 +403,11 @@ int16_t Board::getPiecePhase(int type) {
     return phaseMap.at(type);
 }
 
-constexpr std::array<int16_t, 6> valueMap {
-    100, 320, 330, 500, 900, VALUE_INFINITE
-};
-
-int16_t Board::getPieceValue(int type) {
-    return valueMap.at(type);
-}
-
-int16_t Board::getPieceValue(PieceType type) {
-    return valueMap.at(type);
-}
-
 int16_t Board::getMaterialCount(Board::PieceColor side) const {
     int16_t material = 0;
     for(int type = Board::pawns; type < Board::king; ++type) {
         int16_t count = std::popcount(getPieceSet(static_cast<Board::PieceType>(type), side));
-        material += count * Board::getPieceValue(type);
+        material += count * getPieceValue(type);
     }
 
     return material;

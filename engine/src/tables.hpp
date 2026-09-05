@@ -29,7 +29,7 @@ constexpr int NUM_PHASES = 2;
 namespace Tables {
     inline Random rand;
     inline bool initialized = false;
-    
+
     uint64_t getRayMoves(uint16_t ind, Board::Directions dir);
     uint64_t getSliderMoves(uint16_t ind, Board::SliderRays dir);
 
