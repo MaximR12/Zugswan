@@ -34,7 +34,8 @@ int16_t quiescenceSearch(GameState* state, SearchMetrics& metrics, int16_t alpha
     
     ++metrics.nodes;
 
-    int16_t staticEval = Eval::evaluate(state);
+    bool evalIsLazy;
+    int16_t staticEval = Eval::evaluate(state, alpha, beta, evalIsLazy);
     int16_t bestScore = staticEval;
     
     if(bestScore >= beta)
@@ -149,6 +150,7 @@ int16_t alphaBeta(GameState* state, SearchMetrics& metrics, FixedVector<Move, MA
     FixedVector<Move, MAX_SEARCH_DEPTH> moveLine;
     Move move;
     
+    bool evalIsLazy = false;
     int16_t staticEval = VALUE_UNDEFINED;
     uint64_t zobrist = state->getZobrist();
     TransposeEntry* tEntry = Tables::TTable.probe(zobrist);
@@ -184,7 +186,7 @@ int16_t alphaBeta(GameState* state, SearchMetrics& metrics, FixedVector<Move, MA
     int16_t margin = FUTILITY_MARGIN*depth;
     if(canFutilityPrune) {
         if(staticEval == VALUE_UNDEFINED)
-            staticEval = Eval::evaluate(state);
+            staticEval = Eval::evaluate(state, alpha, beta, evalIsLazy); 
         if(staticEval >= margin + beta)
             return beta;
     }
@@ -248,7 +250,7 @@ int16_t alphaBeta(GameState* state, SearchMetrics& metrics, FixedVector<Move, MA
                     Tables::updateHistory(state->getTurn(), qMove.getFrom(), qMove.getTo(), -malus);
             }
 
-            Tables::TTable.insert(zobrist, NodeType::lower, move, depth, score, staticEval);
+            Tables::TTable.insert(zobrist, NodeType::lower, move, depth, score, evalIsLazy ? VALUE_UNDEFINED : staticEval);
             return bestScore;
         }
 
@@ -256,7 +258,7 @@ int16_t alphaBeta(GameState* state, SearchMetrics& metrics, FixedVector<Move, MA
     }
 
     if(!stopRequested.load(std::memory_order_relaxed))
-        Tables::TTable.insert(zobrist, type, bestMove, depth, bestScore, staticEval);
+        Tables::TTable.insert(zobrist, type, bestMove, depth, bestScore, evalIsLazy ? VALUE_UNDEFINED : staticEval);
 
     return alpha;
 }

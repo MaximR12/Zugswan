@@ -72,8 +72,17 @@ Score evalBishop(Board* board, uint16_t square, Board::PieceColor turn) {
 
 Score evalRook(Board* board, uint16_t square, Board::PieceColor turn) {
     constexpr Score MOBILITY_BONUS = {2, 4};
+    constexpr Score MISSING_PAWN_BONUS = {2, 3};
+    constexpr Score OPEN_FILE_BONUS = {20, 15};
+    constexpr Score SEMI_OPEN_FILE_BONUS = {10, 8};
     
     Score score = {Board::getPieceValue(Board::rooks), Board::getPieceValue(Board::rooks)};
+
+    constexpr uint16_t STARTING_PAWNS = 16;
+    uint64_t allPawns = board->getPieceSet(Board::pawns, Board::white) | board->getPieceSet(Board::pawns, Board::black);
+    uint16_t pawnCount = Board::bitCount(allPawns);
+    score.mgScore += (STARTING_PAWNS - pawnCount) * MISSING_PAWN_BONUS.mgScore;
+    score.egScore += (STARTING_PAWNS - pawnCount) * MISSING_PAWN_BONUS.egScore;
 
     uint64_t pawnSet = board->getPieceSet(Board::pawns, turn);
     uint64_t oppPawnSet = board->getPieceSet(Board::pawns, Board::getOppositeColor(turn));
@@ -86,11 +95,32 @@ Score evalRook(Board* board, uint16_t square, Board::PieceColor turn) {
     score.mgScore += (mobility - AVERAGE_MOBILITY) * MOBILITY_BONUS.mgScore;
     score.egScore += (mobility - AVERAGE_MOBILITY) * MOBILITY_BONUS.egScore;
 
+    uint64_t rookFile = turn == Board::white ? Tables::getRayMoves(square, Board::north) : Tables::getRayMoves(square, Board::south);
+    if(!(rookFile & allPawns)){ //open file
+        score.mgScore += OPEN_FILE_BONUS.mgScore;
+        score.egScore += OPEN_FILE_BONUS.egScore;
+    } else if(!(rookFile & pawnSet)) { //semi open file
+        score.mgScore += SEMI_OPEN_FILE_BONUS.mgScore;
+        score.egScore += SEMI_OPEN_FILE_BONUS.egScore;
+    }
+
     return score;
 }
 
-Score evalQueen() {
-    return {Board::getPieceValue(Board::queens), Board::getPieceValue(Board::queens)};
+Score evalQueen(Board* board, uint16_t square, Board::PieceColor turn) {
+    constexpr std::array<uint16_t, 8> DEVELOPMENT_PENALTIES = {
+        0, 0, 4, 8, 12, 16, 20, 24
+    };
+
+    Score score = {Board::getPieceValue(Board::queens), Board::getPieceValue(Board::queens)};
+
+    uint64_t squareBB = 1ULL<<square;
+    int rank = Board::getRank(squareBB);
+    int distance = turn == Board::white ? rank : 7-rank;
+
+    score.mgScore -= DEVELOPMENT_PENALTIES[distance];
+
+    return score;
 }
 
 Score evalPiece(Board* board, uint16_t square, Board::PieceType type, Board::PieceColor turn) {
@@ -102,7 +132,7 @@ Score evalPiece(Board* board, uint16_t square, Board::PieceType type, Board::Pie
         case(Board::rooks):
             return evalRook(board, square, turn);
         case(Board::queens):
-            return evalQueen();
+            return evalQueen(board, square, turn);
         default:
             return {0, 0};
     }
@@ -300,13 +330,26 @@ int16_t kingSafetyScore(GameState* state) {
     return tropismScore + shelterBonus;
 }
 
-int16_t Eval::evaluate(GameState* state) {
+int16_t Eval::evaluate(GameState* state, int16_t alpha, int16_t beta, bool& isLazy) {
+    constexpr int16_t LAZY_MARGIN = 200;
     constexpr int16_t TEMPO_BONUS = 10;
+
+    int16_t phase = state->getPhase();
     int16_t sideMultiple = getSideMultiple(state->getTurn());
-    // int16_t materialBalance = state->getMaterial(Board::white) - state->getMaterial(Board::black);
+    int16_t materialBalance = state->getMaterial(Board::white) - state->getMaterial(Board::black);
 
     int16_t pstScoreMid = state->getPst(Board::middle, Board::white) - state->getPst(Board::middle, Board::black);
     int16_t pstScoreEnd = state->getPst(Board::end, Board::white) - state->getPst(Board::end, Board::black);
+
+    int16_t lazyMid = materialBalance + pstScoreMid;
+    int16_t lazyEnd = materialBalance + pstScoreEnd;
+    int16_t lazyEval = ((lazyMid * (256 - phase)) + (lazyEnd * phase)) / 256;
+    lazyEval = lazyEval * sideMultiple + TEMPO_BONUS;
+
+    if(lazyEval <= alpha - LAZY_MARGIN || lazyEval >= beta + LAZY_MARGIN) {
+        isLazy = true;
+        return lazyEval;
+    }
 
     Score pawnScore = getPawnScore(state);
     Score piecesScore = evalPieces(state->getBoard(), Board::white) - evalPieces(state->getBoard(), Board::black);
@@ -316,9 +359,9 @@ int16_t Eval::evaluate(GameState* state) {
  
     int16_t evalMid = piecesScore.mgScore + pawnMaterial + pstScoreMid + pawnScore.mgScore + kingSafetyScore(state);
     int16_t evalEnd = piecesScore.egScore + pawnMaterial + pstScoreEnd + pawnScore.egScore;
-    
-    int16_t phase = state->getPhase();
     int16_t eval = ((evalMid * (256 - phase)) + (evalEnd * phase)) / 256;
-    
-    return eval * sideMultiple + TEMPO_BONUS;
+    eval = eval * sideMultiple + TEMPO_BONUS;
+
+    isLazy = false;
+    return eval;
 }
