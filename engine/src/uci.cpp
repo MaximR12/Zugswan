@@ -5,6 +5,7 @@
 #include "uci.hpp"
 #include "perft.hpp"
 #include "search.hpp"
+#include "benchpositions.hpp"
 #include "sstream"
 
 void UCI::go(std::istringstream& args) {
@@ -82,23 +83,6 @@ void UCI::position(std::istringstream& args) {
     m_state->moveFromList(moveList);
 }
 
-int parsePosFile(std::vector<std::string>& positionSet) {
-    std::ifstream file("..\\..\\..\\engine\\tests\\testfens.txt");
-
-    if(!file.is_open()) {
-        std::cerr << "Error opening fen file.\n";
-        return 0;
-    }
-
-    std::string line;
-    while(std::getline(file, line, ';')) {
-        positionSet.push_back(line);
-        std::getline(file, line); //go to next new line
-    }
-
-    return 1;
-}
-
 void UCI::bench(std::istringstream& args) {
     if(!m_working && m_worker.joinable())
         m_worker.join();
@@ -110,21 +94,19 @@ void UCI::bench(std::istringstream& args) {
     std::string position, type;
     args >> hashSize >> threads >> limit >> position >> type;
 
-    std::vector<std::string> positionSet;
-    positionSet.reserve(64);
-    if(position == "default")
-        parsePosFile(positionSet);
-
     if(type == "perft") {
         m_worker = std::thread{[state = m_state, this, limit]() {
             Perft::run<Perft::bench>(state, limit);
             m_working = false;
         }};
     } else if(type == "depth") {
-        m_worker = std::thread{[state = m_state, this, positionSet, limit]() {
+        m_worker = std::thread{[state = m_state, this, limit]() {
+            constexpr auto positionSet = BenchPositions::POSITIONS;
+
             uint64_t totalNodes = 0;
             double totalTime = 0;
-            for(const auto& pos : positionSet) {
+            for(const auto& posSV : positionSet) {
+                std::string pos{posSV};
                 Tables::TTable.clear();
                 std::cout << "FEN: " << pos << std::endl;
                 state->loadPosition(pos);
