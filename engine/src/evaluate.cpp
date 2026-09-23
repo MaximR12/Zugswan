@@ -212,7 +212,6 @@ Score calcPawnScore(Board* board, uint16_t pawnInd, Board::PieceColor turn) {
     }
 
     if(!(pawnPath & (oppPawnControl | oppPawnSet))) { //passed
-
         int rank = Board::getRank(pawnBB);
         score.mgScore += PASSED_BONUSES[turn == Board::white ? rank : 7-rank].mgScore;
         score.egScore += PASSED_BONUSES[turn == Board::white ? rank : 7-rank].egScore;
@@ -235,8 +234,7 @@ Score evalPawnStructure(GameState* state, Board::PieceColor turn) {
     size_t size = Board::serializeBitboard(board->getPieceSet(Board::pawns, turn), indBuf);
     for(int i = 0; i < size; ++i) {
         Score pawnScore = calcPawnScore(board, indBuf[i], turn); 
-        score.mgScore += pawnScore.mgScore;
-        score.egScore += pawnScore.egScore; 
+        score += pawnScore;
     }
 
     return score;
