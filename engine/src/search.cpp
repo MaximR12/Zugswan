@@ -223,7 +223,8 @@ int16_t alphaBeta(GameState* state, SearchMetrics& metrics, FixedVector<Move, MA
         if(depth < reductionLimit || movesSearched < fullDepthMoves)
             score = -alphaBeta(state, metrics, moveLine, -beta, -alpha, depth-1, ply+1);
         else {
-            score = -alphaBeta(state, metrics, moveLine, -beta, -alpha, depth-2, ply+1);
+            int reduction = Tables::lmrDepth(depth, movesSearched+1);
+            score = -alphaBeta(state, metrics, moveLine, -beta, -alpha, depth-1-reduction, ply+1);
             if(score > alpha)
                 score = -alphaBeta(state, metrics, moveLine, -beta, -alpha, depth-1, ply+1);
         }

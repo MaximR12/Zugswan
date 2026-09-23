@@ -1,6 +1,7 @@
 #include "tables.hpp"
 #include <chrono>
 #include <algorithm>
+#include <cmath>
 
 std::array<std::array<uint64_t, NUM_SQUARES>, 2> pawnAttackTable;
 std::array<uint64_t, NUM_SQUARES> kingMoveTable;
@@ -311,6 +312,19 @@ uint64_t Tables::rookAttacks(uint16_t square, uint64_t occupied) {
     return magicTable[offset + occupied];
 }
 
+constexpr int MAX_DEPTH = 128, MAX_MOVES = 256;
+std::array<std::array<int, MAX_DEPTH>, MAX_MOVES> lmrTable;
+
+void initLmrTable() {
+    for(int depth = 0; depth < MAX_MOVES; ++depth)
+        for(int moves = 0; moves < 256; ++moves)
+            lmrTable[depth][moves] = static_cast<int>(0.99 + std::log(depth) * std::log(moves) / 3.14);
+}
+
+int Tables::lmrDepth(int depth, int moves) {
+    return lmrTable[depth][moves];
+}
+
 std::array<std::array<uint16_t, NUM_SQUARES>, NUM_SQUARES> distanceTable;
 
 void initDistance() {
@@ -484,6 +498,7 @@ void Tables::init() {
     initKnightMoveTable();
     initKingMoveTable();
 
+    initLmrTable();
     initDistance();
 
     initMagicTable();

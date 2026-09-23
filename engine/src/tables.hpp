@@ -40,6 +40,7 @@ namespace Tables {
     uint64_t rookAttacks(uint16_t square, uint64_t occupied);
 
     int lookupDistance(uint16_t from, uint16_t to);
+    int lmrDepth(int depth, int moves);
 
     int16_t pstScore(Board::Phase phase, Board::PieceColor side, Board::PieceType type, uint16_t square);
     int16_t historyScore(Board::PieceColor side, uint16_t from, uint16_t to);
