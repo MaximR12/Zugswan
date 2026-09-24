@@ -223,7 +223,15 @@ int16_t alphaBeta(GameState* state, SearchMetrics& metrics, FixedVector<Move, MA
         if(depth < reductionLimit || movesSearched < fullDepthMoves)
             score = -alphaBeta(state, metrics, moveLine, -beta, -alpha, depth-1, ply+1);
         else {
+            constexpr int16_t LOW_HISTORY_THRESHOLD = -2500, HIGH_HISTORY_THRESHOLD = 8500;
             int reduction = Tables::lmrDepth(depth, movesSearched+1);
+            int16_t history = Tables::historyScore(Board::getOppositeColor(state->getTurn()), move.getFrom(), move.getTo());
+            if(history < LOW_HISTORY_THRESHOLD)
+                reduction++;
+            else if(history > HIGH_HISTORY_THRESHOLD)
+                reduction--;
+            reduction = std::clamp(reduction, 0, depth-1);
+
             score = -alphaBeta(state, metrics, moveLine, -beta, -alpha, depth-1-reduction, ply+1);
             if(score > alpha)
                 score = -alphaBeta(state, metrics, moveLine, -beta, -alpha, depth-1, ply+1);
