@@ -219,10 +219,16 @@ int16_t alphaBeta(GameState* state, SearchMetrics& metrics, FixedVector<Move, MA
         state->makeMove(move);
 
         int16_t score;
-        constexpr int fullDepthMoves = 4, reductionLimit = 3;
-        if(depth < reductionLimit || movesSearched < fullDepthMoves)
-            score = -alphaBeta(state, metrics, moveLine, -beta, -alpha, depth-1, ply+1);
-        else {
+        constexpr int FULL_DEPTH_MOVES = 4, REDUCTION_LIMIT = 3, LMP_THRESHOLD = 8;
+        if(depth < REDUCTION_LIMIT || movesSearched < FULL_DEPTH_MOVES) {
+            if(movesSearched < LMP_THRESHOLD || move.isCapture() || state->inCheck())
+                score = -alphaBeta(state, metrics, moveLine, -beta, -alpha, depth-1, ply+1);
+            else if(depth < REDUCTION_LIMIT) { //Late move pruning
+                state->unmakeMove(move);
+                move = moveList.pick_move();
+                continue;
+            }
+        } else {
             constexpr int16_t LOW_HISTORY_THRESHOLD = -2500, HIGH_HISTORY_THRESHOLD = 8500;
             int reduction = Tables::lmrDepth(depth, movesSearched+1);
             int16_t history = Tables::historyScore(Board::getOppositeColor(state->getTurn()), move.getFrom(), move.getTo());
